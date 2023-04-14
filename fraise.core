@@ -1,0 +1,19 @@
+CAPI=2:
+# Copyright INTEGNANO University Of Paris Saclay 2023 
+# written by: ourspalois
+
+name: "integnano:fraise:fraise"
+description: "Fraise is the wrapper for the control of the bayesian machine developped by integnano"
+filesets:
+    rtl_files:
+        depend : 
+            - integnano:fraise:rtl_bayesian_machine
+        files: 
+            - rtl/fraise_top.sv
+        file_type: systemVerilogSource
+
+targets: 
+    default: 
+        filesets: 
+            - rtl_files
+        
