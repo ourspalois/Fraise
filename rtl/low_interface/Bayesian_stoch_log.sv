@@ -6,7 +6,6 @@
 // Updated for 6/12/21 Run, 4x4 array of 64x64 RRAM 
 
 // this code has no rram sv behavioral module (for synthesis and P&R purposes)
-`timescale 1ns / 1ps
 //`include "RRAM_array.sv"
 
 module Bayesian_stoch_log #(
@@ -80,9 +79,10 @@ module Bayesian_stoch_log #(
 
 
   //  Likelihoods Array generate
-
+  /* verilator lint_off UNOPTFLAT */
   wire bit_next[2**Narray:1][2**Narray:0];
   wire [2**Narray-1:0] bit_out2;
+  /* verilator lint_off UNOPTFLAT */
   wire [2**Nword_used-1:0] DATA_next[2**Narray:1][2**Narray:0];
   wire [2**Nword_used-1:0] reg_out[2**Narray-1:0];
 

@@ -7,22 +7,24 @@ name : "integnano:fraise:rtl_bayesian_machine"
 description: "Top description of INTEGNANO's stochastic log inference matrix" 
 filesets:
   rtl_files: 
+    depend:
+      - integnano:fraise:mem
     files:
-      - rtl/additions.sv
-      - rtl/Bayesian_stoch_log.sv
-      - rtl/bot_logic.sv
-      - rtl/complex_decoder_left_priors.sv
-      - rtl/complex_decoder_right.sv
-      - rtl/complex_decoder_top.sv
-      - rtl/decoder_bot.sv
-      - rtl/decoder_left.sv
-      - rtl/decoder_right.sv
-      - rtl/decoder_top.sv
-      - rtl/Gupta.sv
-      - rtl/LFSR_1bL.sv
-      - rtl/likelihood.sv
-      - rtl/register_out.sv
-      - rtl/selecting.sv
+      - additions.sv
+      - Bayesian_stoch_log.sv
+      - bot_logic.sv
+      - complex_decoder_left_priors.sv
+      - complex_decoder_left.sv
+      - complex_decoder_top.sv
+      - decoder_bot.sv
+      - decoder_left.sv
+      - decoder_right.sv
+      - decoder_top.sv
+      - Gupta.sv
+      - LFSR_1bL.sv
+      - likelihood.sv
+      - register_out.sv
+      - selecting.sv
     file_type: systemVerilogSource
 
 targets:

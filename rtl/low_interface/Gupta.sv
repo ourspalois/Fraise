@@ -14,8 +14,9 @@ module Gupta #(
     input logic [M-1:0] proba,
     output logic probabit
 );
-
+  /* verilator lint_off UNOPTFLAT */
   logic [M-2:0] Ni;
+  /* verilator lint_off UNOPTFLAT */
   logic [M-2:0] Oi;
 
   //Bloc 1

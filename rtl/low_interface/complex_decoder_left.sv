@@ -19,6 +19,7 @@ module complex_decoder_left #(
 );
 
   // Instructions
+  /* verilator lint_off IMPLICIT */
   assign read = read_1 | read_8;
 
   // Decoder
