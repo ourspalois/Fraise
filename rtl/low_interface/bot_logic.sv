@@ -50,6 +50,4 @@ module bot_logic #(
       .proba_out(DATA_next)
   );
 
-
-
 endmodule
