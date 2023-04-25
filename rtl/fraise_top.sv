@@ -36,7 +36,7 @@ module fraise_top #(
     
 
     // the accelerator resgisters adresses. 
-    localparam int unsigned REG_START = 32'h0010 ; 
+    localparam int unsigned REG_START = 32'h00010 ; 
     localparam int unsigned ON_OFF_REG = 32'h000 + REG_START ; // 0 iddle, 1 inference (continuous)
     localparam int unsigned SEED_REG = 32'h004 + REG_START ; 
     localparam int unsigned OBS_REG_1 = 32'h008 + REG_START ;
@@ -119,7 +119,6 @@ module fraise_top #(
                 MODE_REG: begin 
                     if(req_wen_i) begin
                         mode <= req_wdata_i[0] ;
-                        // TODO: use logarithmic mode 
                     end
                     device_read_data = {31'b0, mode} ;
                 end
@@ -131,8 +130,8 @@ module fraise_top #(
                 end
                 default: begin
                     `ifdef VERILATOR 
-                        $display("FRAISE ERROR : addres out of range of the control registers : %h", req_addr_i);
-                    `endif 
+                        $display("FRAISE ERROR : addres out of range of the memory : %h", req_addr_i);
+                    `endif
                 end
             endcase
             resp_valid_o <= 1'b1; 
@@ -148,9 +147,10 @@ module fraise_top #(
 
     typedef enum int { 
         Idle,
-        Write_obs,
-        Read, 
+        Read_obs,
+        Read_cycles,
         Run_stoch, 
+        Read_out,
         Run_log,
         Done
      } inference_state_e;
@@ -158,9 +158,7 @@ module fraise_top #(
     inference_state_e inference_state ; 
 
     typedef enum int { 
-        Start,
-        WL_rise,
-        SL_rise,
+        SL_WL_rise,
         Sl_fall,
         WLfall
     } read_state_e ;
@@ -168,17 +166,18 @@ module fraise_top #(
     read_state_e read_state ;
 
     always_ff @( posedge(clk_i) ) begin : Inference_machine
+        
         case(inference_state)
             Idle: begin
-                read_state <= Start ;
-                counter_reset <= '0 ;
+                read_state <= SL_WL_rise ;
+                counter <= '0 ;
                 counter_run_reset <= '0 ;
                 if(ON_OFF_reg == On | launch_reg == '1) begin
-                    inference_state <= Write_obs;
-                    counter_en <= '1 ;
+                    inference_state <= Read_obs;
+                    read_8 <= '1 ;
                 end 
             end
-            Write_obs: begin
+            Read_obs: begin
                 if(counter == 0) begin
                     load_seed <= '1 ;
                 end else begin
@@ -189,58 +188,39 @@ module fraise_top #(
                 stoch_log <= mode ;
                 inference <= '1 ;
 
-                addr_col <= {counter[1:0],Observation_vec[counter[1:0]][2:0], 3'b0} ; 
+                addr_col <= {counter[1:0],Observation_vec[counter[1:0]][2:0] ,3'b0} ; 
                 addr_row <= {2'b0, Observation_vec[counter[1:0]][ArraySizeLog2 + 3 - 1:3]} ;
 
-                if(counter == 8'(MatrixSize-1)) begin
-                    counter_reset <= '1 ;
-                    counter_en <= '0 ;
-                    inference_state <= Read ;
-                end
+                inference_state <= Read_cycles ;
 
             end
-            Read: begin
-                addr_col <= 8'b0 ;
-                addr_row <= 8'b0 ;
-                inference <= '1 ;
+            Read_cycles: begin
                 case (read_state)
-                    Start: begin
-                        counter_read_en <= '1 ;
-                        counter_read_reset <= '0 ;
-                        read_state <= WL_rise ;
-                    end
-                    WL_rise: begin
+
+                    SL_WL_rise : begin
                         WL_signal <= '1 ;
-                        if(counter_read >= 1) begin
-                            read_state <= SL_rise ;
-                        end
-                    end
-                    SL_rise: begin
                         SL_signal <= '1 ;
-                        if(counter_read >= 3) begin
-                            read_state <= Sl_fall ;
-                        end
-                    end
-                    Sl_fall: begin
+                        read_state <= Sl_fall ;
+                    end 
+                    Sl_fall : begin
                         SL_signal <= '0 ;
-                        if(counter_read >= 6) begin
-                            read_state <= WLfall ;
-                        end
+                        read_state <= WLfall ;
                     end
-                    WLfall: begin
+                    WLfall : begin
                         WL_signal <= '0 ;
-                        inference_state <= (mode == 0) ? Run_stoch : Run_log ;
-                        counter_run_en <= '1 ;
-                        read_state <= Start ;
-                        if(mode == 1) begin
-                            read_out <= '1 ;
+                        read_state <= SL_WL_rise ;
+                        if(counter == 8'(MatrixSize-1)) begin
+                            inference_state <= (mode == 0) ? Run_stoch : Read_out ;
+                            counter_run_en <= '1 ;
+                        end else begin
+                            inference_state <= Read_obs ;
                         end
+                        counter <= counter + 1 ;
                     end
                 endcase
+                
             end
             Run_stoch: begin
-                ready_o <= '1 ;
-                counter_reset <= '0 ;
 
                 results[0] <= results[0] + 8'(bit_out[0]) ;
                 results[1] <= results[1] + 8'(bit_out[1]) ;
@@ -252,9 +232,12 @@ module fraise_top #(
                     inference_state <= Done;
                 end 
             end
+            Read_out:begin
+                read_out <= '1 ;
+                inference <= '0 ;
+                inference_state <= Run_log ;
+            end
             Run_log: begin
-                ready_o <= '1 ;
-                counter_reset <= '0 ;
 
                 results[0] <= results[0] | ({7'b0, bit_out[0]} << counter) ;
                 results[1] <= results[1] | ({7'b0, bit_out[1]} << counter) ;
@@ -263,11 +246,14 @@ module fraise_top #(
 
                 if(counter_run >= 7) begin
                     counter_run_en <= '0 ;
-                    read_out <= '0 ;
                     inference_state <= Done;
                 end
             end
             Done: begin
+                ready_o <= '1 ;
+                read_8 <= '0 ;
+                read_out <= '0 ;
+                inference <= '0 ;
                 counter_run_reset <= '1 ;
                 res_valid <= '1 ; 
                 inference_state <= Idle;
@@ -278,15 +264,6 @@ module fraise_top #(
     // counter 
 
     logic [2**Nword_used-1:0] counter ;
-    logic counter_reset, counter_en ; 
-
-    always_ff @( posedge(clk_i) ) begin : compteur
-        if(counter_reset) begin
-            counter <= '0 ; 
-        end else if(counter_en) begin
-            counter <= counter + 1 ; 
-        end
-    end
 
     //run counter
 
@@ -315,6 +292,8 @@ module fraise_top #(
     end
 
 
+
+
     // interface with Bayesian_stoch_log TODO: add a proper interface 
 
     logic [ArraySizeLog2 + MatrixSizeLog2 -1 :0] addr_col ;
@@ -322,6 +301,7 @@ module fraise_top #(
     logic stoch_log, inference, load_seed, read_1, read_8, load_mem, read_out ;
     logic [2**Nword_used-1:0] seeds ; 
     logic [MatrixSize-1:0] bit_out ;
+    logic CBL, CBLEN ; 
     logic WL_signal, SL_signal, precharge_en ;
     
     Bayesian_stoch_log #(
@@ -330,8 +310,8 @@ module fraise_top #(
         .Nword_used(Nword_used)
     ) e_Bayesian_stoch_log (
         .clk(clk_i),
-        .CBL(),
-        .CBLEN('0), // 1 when pcsa connected 0 when not
+        .CBL(CBL),
+        .CBLEN(CBLEN), // 1 when pcsa connected 0 when not
         .CSL(SL_signal), // 1 when CWlen IS ENABLED 
         .CWL(WL_signal),  
 
@@ -354,8 +334,7 @@ module fraise_top #(
     always_ff @(posedge(clk_i)) begin : Reset_management
         if(!reset_n) begin
             inference_state <= Idle;
-            counter_reset <= '0 ;
-            counter_en <= '0 ;
+            counter <= '0 ;
             counter_run_reset <= '0 ;
             counter_run_en <= '0 ;
             ON_OFF_reg <= Off ;
