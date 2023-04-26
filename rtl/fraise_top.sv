@@ -2,7 +2,7 @@
 
 // author : Ourspalois, INTEGNANO, 2023
 
-module fraise_top #(
+module fraise_top  #(
     parameter int unsigned DataWidth = 32, 
     parameter int unsigned AddrWidth = 32,
     parameter int unsigned MatrixSize = 4, // I consider them square
@@ -30,6 +30,9 @@ module fraise_top #(
     output logic [NbrHostsLog2-1:0] resp_ini_addr_o ,// the adress of the initiator of the request
     output logic irq_o // interrupt signal
 ) ;
+    //pkg 
+    import comparator_pkg::*;
+
     // logs 
     localparam int unsigned MatrixSizeLog2 = (MatrixSize == 1) ? 1 : $clog2(MatrixSize) ;
     localparam int unsigned ArraySizeLog2 = (ArraySize == 1) ? 1 : $clog2(ArraySize) ;
@@ -46,6 +49,12 @@ module fraise_top #(
     localparam int unsigned RES_REG = 32'h018 + REG_START ;
     localparam int unsigned MODE_REG = 32'h01C + REG_START ; // 0 : stachastic, 1 : logarithmic
     localparam int unsigned IRQ_EN_REG = 32'h020 + REG_START ; // 0 : no irq, 1 : irq when res is valid
+    localparam int unsigned PRECISION_REG = 32'h024 + REG_START ; 
+    localparam int unsigned COMP_INSTRUCTION_REG = 32'h028 + REG_START ;
+    localparam int unsigned COMP_REFERENCE = 32'h02C + REG_START ;
+    localparam int unsigned COMP_RESULT = 32'h030 + REG_START ;
+    localparam int unsigned COMP_BYPASS = 32'h034 + REG_START ;
+
 
     logic [DataWidth-1:0] device_read_data;
 
@@ -71,8 +80,6 @@ module fraise_top #(
     logic stay_high ;
 
     logic [MatrixSize-1:0][2**Nword_used-1:0] results ;
-
-    assign irq_o = res_valid & irq_en ; 
 
     // function to decode the input of the accelerator 
     always_ff @(posedge(clk_i)) begin : ReadInput
@@ -128,6 +135,33 @@ module fraise_top #(
                     end
                     device_read_data = {31'b0, irq_en} ;
                 end
+                PRECISION_REG: begin
+                    if(req_wen_i) begin
+                        comp_precision <= req_wdata_i ;
+                    end 
+                    device_read_data = comp_precision ;
+                end
+                COMP_INSTRUCTION_REG: begin
+                    if(req_wen_i) begin
+                        comp_instr <= req_wdata_i ;
+                    end 
+                    device_read_data = comp_instr ;
+                end
+                COMP_REFERENCE: begin
+                    if(req_wen_i) begin
+                        comp_reference <= req_wdata_i ;
+                    end 
+                    device_read_data = comp_reference ;
+                end
+                COMP_RESULT: begin
+                    device_read_data = {28'b0, comp_res} ;
+                end
+                COMP_BYPASS: begin
+                    if(req_wen_i) begin
+                        comparator_bypass <= req_wdata_i[0] ;
+                    end 
+                    device_read_data = {31'b0, comparator_bypass} ;
+                end
                 default: begin
                     `ifdef VERILATOR 
                         $display("FRAISE ERROR : addres out of range of the memory : %h", req_addr_i);
@@ -143,11 +177,76 @@ module fraise_top #(
         end
     end
 
+    // irq management
+    localparam int unsigned res_size = 2**Nword_used;
+
+    logic [MatrixSize-1:0] decision_result ; 
+    logic comparator_bypass ; 
+
+    logic [MatrixSize-1:0] comp_res ; 
+    logic [MatrixSize-1:0][res_size-1:0] comp_precision ; // only usefull for == test 
+    logic [MatrixSize-1:0][res_size-1:0] comp_reference ; 
+    logic [MatrixSize-1:0][res_size-1:0] comp_instr; 
+
+    genvar i ;
+    generate
+        for (i = 0; i< MatrixSize ; i = i+1) begin
+            comparator #(.DataWidth(2**Nword_used)) u_comp (
+                .instruction(comp_instr[i]),
+                .op_a(results[i]),
+                .op_b(comp_reference[i]),
+                .op_precision(comp_precision[i]),
+                .result(comp_res[i])
+            ) ; 
+        end
+    endgenerate
+
+    logic [MatrixSize-1:0] min_max_res ; 
+
+    always_comb begin
+        if(res_valid) begin
+            /* verilator lint_off CASEINCOMPLETE */
+            case(comp_instr[0])
+            min: begin
+                min_max_res[0] = (results[0] < results[1] & results[0] < results[2] & results[0] < results[3]) ? 1'b1 : 1'b0 ;
+                min_max_res[1] = (results[1] < results[0] & results[1] < results[2] & results[1] < results[3]) ? 1'b1 : 1'b0 ;
+                min_max_res[2] = (results[2] < results[0] & results[2] < results[1] & results[2] < results[3]) ? 1'b1 : 1'b0 ;
+                min_max_res[3] = (results[3] < results[0] & results[3] < results[1] & results[3] < results[2]) ? 1'b1 : 1'b0 ; 
+            end
+            max: begin
+                min_max_res[0] = (results[0] > results[1] & results[0] > results[2] & results[0] > results[3]) ? 1'b1 : 1'b0 ;
+                min_max_res[1] = (results[1] > results[0] & results[1] > results[2] & results[1] > results[3]) ? 1'b1 : 1'b0 ;
+                min_max_res[2] = (results[2] > results[0] & results[2] > results[1] & results[2] > results[3]) ? 1'b1 : 1'b0 ;
+                min_max_res[3] = (results[3] > results[0] & results[3] > results[1] & results[3] > results[2]) ? 1'b1 : 1'b0 ;
+            end
+            endcase
+        end 
+    end
+
+    always_ff @(posedge(clk_i)) begin
+        if(res_valid) begin
+            if(comp_instr[0] == min | comp_instr[0] == max) begin
+                decision_result <= min_max_res ;
+            end else begin
+                decision_result <= comp_res ;
+            end
+            if(irq_en) begin
+                if (comparator_bypass) begin
+                    irq_o <= 1'b1 ;
+                end else begin
+                    irq_o <= (decision_result != 0) ? 1'b1 : 1'b0 ;
+                end
+            end
+        end else begin
+            irq_o <= 1'b0 ;
+        end
+    end 
+
+
     // inference 
 
     typedef enum int { 
         Idle,
-        Read_obs,
         Read_cycles,
         Run_stoch, 
         Read_out,
@@ -173,30 +272,18 @@ module fraise_top #(
                 counter <= '0 ;
                 counter_run_reset <= '0 ;
                 if(ON_OFF_reg == On | launch_reg == '1) begin
-                    inference_state <= Read_obs;
+                    inference_state <= Read_cycles;
                     read_8 <= '1 ;
                 end 
             end
-            Read_obs: begin
-                if(counter == 0) begin
-                    load_seed <= '1 ;
-                end else begin
-                    load_seed <= '0 ;
-                end
+            Read_cycles: begin
                 ready_o <= '0 ; 
                 launch_reg <= '0 ; 
                 stoch_log <= mode ;
                 inference <= '1 ;
-
-                addr_col <= {counter[1:0],Observation_vec[counter[1:0]][2:0] ,3'b0} ; 
-                addr_row <= {2'b0, Observation_vec[counter[1:0]][ArraySizeLog2 + 3 - 1:3]} ;
-
-                inference_state <= Read_cycles ;
-
-            end
-            Read_cycles: begin
+                addr_col = {counter[1:0],Observation_vec[counter[1:0]][2:0] ,3'b0} ; 
+                addr_row = {2'b0, Observation_vec[counter[1:0]][ArraySizeLog2 + 3 - 1:3]} ;
                 case (read_state)
-
                     SL_WL_rise : begin
                         WL_signal <= '1 ;
                         SL_signal <= '1 ;
@@ -212,9 +299,7 @@ module fraise_top #(
                         if(counter == 8'(MatrixSize-1)) begin
                             inference_state <= (mode == 0) ? Run_stoch : Read_out ;
                             counter_run_en <= '1 ;
-                        end else begin
-                            inference_state <= Read_obs ;
-                        end
+                        end 
                         counter <= counter + 1 ;
                     end
                 endcase

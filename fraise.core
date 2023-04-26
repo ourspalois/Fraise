@@ -5,14 +5,21 @@ CAPI=2:
 name: "integnano:fraise:fraise"
 description: "Fraise is the wrapper for the control of the bayesian machine developped by integnano"
 filesets:
+  rtl_pkg:
+    files: 
+      - rtl/comparator_instr_pkg.sv
+    file_type: systemVerilogSource
+
   rtl_files:
     depend : 
       - integnano:fraise:rtl_bayesian_machine
     files: 
       - rtl/fraise_top.sv
+      - rtl/comparator.sv
     file_type: systemVerilogSource
 
 targets: 
   default:
     filesets: 
+      - rtl_pkg
       - rtl_files

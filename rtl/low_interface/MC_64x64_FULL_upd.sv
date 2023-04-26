@@ -10,7 +10,7 @@ module MC_64x64_FULL_upd (
 
     output logic [63:0] DOUT
 );
-    /*
+    
     logic [63:0] CWL ;
     genvar h ; 
     generate
@@ -33,7 +33,7 @@ module MC_64x64_FULL_upd (
             );
         end
     endgenerate 
-    */
+    
 endmodule
 
 module line_matrix (
@@ -91,10 +91,8 @@ module cell_matrix (
                     2'b11: begin
                         memristors[1] = 1'b1;
                     end
-                    default: begin
-                        rd_en = 1'b0;
-                    end
                 endcase
+                rd_en = 1'b0;
             end else begin 
                 if (!CSL && rd_en) begin 
                     if(memristors[0] == memristors[1]) begin 
