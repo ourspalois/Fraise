@@ -21,7 +21,7 @@ module MC_64x64_FULL_upd (
 
     genvar j ; 
     generate
-        for (j = 0;j < 63; j= j+1 ) begin
+        for (j = 0;j <= 63; j= j+1 ) begin
             line_matrix line_matrix_inst (
                 .CWL(CWL[j]),
                 .CBLEN(CBLEN),
@@ -47,7 +47,7 @@ module line_matrix (
 );
     genvar i ; 
     generate
-        for (i = 0 ; i<63 ; i=i+1) begin
+        for (i = 0 ; i<=63 ; i=i+1) begin
             cell_matrix cell_matrix_inst (
                 .CWL(CWL),
                 .CBLEN(CBLEN[i]),
@@ -94,12 +94,12 @@ module cell_matrix (
                 endcase
                 rd_en = 1'b0;
             end else begin 
-                if (!CSL && rd_en) begin 
+                if ((CSL == 1'b0) && (rd_en)) begin 
                     if(memristors[0] == memristors[1]) begin 
                         dout = 'z; // better than x for trsitate buffer
                         rd_en = 1'b0;
                     end else begin 
-                        dout = ~(memristors[0] & DIN) | (memristors[1] & DINb);
+                        dout = ~((memristors[0] && DIN) || (memristors[1] && DINb));
                         rd_en = 1'b0;
                     end
                 end else begin 

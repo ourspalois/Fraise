@@ -54,6 +54,11 @@ module fraise_top  #(
     localparam int unsigned COMP_REFERENCE = 32'h02C + REG_START ;
     localparam int unsigned COMP_RESULT = 32'h030 + REG_START ;
     localparam int unsigned COMP_BYPASS = 32'h034 + REG_START ;
+    localparam int unsigned INFERENCE_WRITE_REG = 32'h038 + REG_START ;
+    localparam int unsigned WRITING_SET_RESET = 32'h03C + REG_START ;
+
+    localparam int unsigned MEM_ARRAY_START = 32'h800 ; // word size of this is 32 bits
+    localparam int unsigned MEM_ARRAY_END = 32'hFFF ;
 
 
     logic [DataWidth-1:0] device_read_data;
@@ -78,12 +83,139 @@ module fraise_top  #(
     logic res_valid, irq_en ; 
     logic mode ; // 0 : stachastic, 1 : logarithmic
     logic stay_high ;
+    logic new_seeds ; 
 
     logic [MatrixSize-1:0][2**Nword_used-1:0] results ;
 
-    // function to decode the input of the accelerator 
-    always_ff @(posedge(clk_i)) begin : ReadInput
-        if(req_valid_i) begin
+    // write in the array 
+    //TODO: make this only compiled with verilator (not used on quartus, dont want to break chips)
+    logic [DataWidth-1:0] data_to_write ; 
+    logic write_en ;
+    logic set_reset ; // 1 if set 0 if reset 
+    logic [DataWidth-1:0] write_addr ; 
+    logic [4:0] write_counter ; 
+    logic [3:0] internal_write_counter ; 
+
+    typedef enum int { 
+        set_CSL, 
+        set_CBL, 
+        set_CWL, 
+        reset_CWL,
+        loop
+    } write_state_e;
+    write_state_e write_state ; 
+
+    // irq management
+    localparam int unsigned res_size = 2**Nword_used;
+
+    logic [MatrixSize-1:0] decision_result ; 
+    logic comparator_bypass ; 
+
+    logic [MatrixSize-1:0] comp_res ; 
+    logic [MatrixSize-1:0][res_size-1:0] comp_precision ; // only usefull for == test 
+    logic [MatrixSize-1:0][res_size-1:0] comp_reference ; 
+    logic [MatrixSize-1:0][res_size-1:0] comp_instr; 
+
+    genvar i ;
+    generate
+        for (i = 0; i< MatrixSize ; i = i+1) begin
+            comparator #(.DataWidth(2**Nword_used)) u_comp (
+                .instruction(comparator_intr_e'(comp_instr[i])) ,
+                .op_a(results[i]),
+                .op_b(comp_reference[i]),
+                .op_precision(comp_precision[i]),
+                .result(comp_res[i])
+            ) ; 
+        end
+    endgenerate
+
+    logic [MatrixSize-1:0] min_max_res ; 
+
+    always_comb begin
+        if(res_valid) begin
+            /* verilator lint_off CASEINCOMPLETE */
+            case(comp_instr[0])
+            min: begin
+                min_max_res[0] = (results[0] < results[1] & results[0] < results[2] & results[0] < results[3]) ? 1'b1 : 1'b0 ;
+                min_max_res[1] = (results[1] < results[0] & results[1] < results[2] & results[1] < results[3]) ? 1'b1 : 1'b0 ;
+                min_max_res[2] = (results[2] < results[0] & results[2] < results[1] & results[2] < results[3]) ? 1'b1 : 1'b0 ;
+                min_max_res[3] = (results[3] < results[0] & results[3] < results[1] & results[3] < results[2]) ? 1'b1 : 1'b0 ; 
+            end
+            max: begin
+                min_max_res[0] = (results[0] > results[1] & results[0] > results[2] & results[0] > results[3]) ? 1'b1 : 1'b0 ;
+                min_max_res[1] = (results[1] > results[0] & results[1] > results[2] & results[1] > results[3]) ? 1'b1 : 1'b0 ;
+                min_max_res[2] = (results[2] > results[0] & results[2] > results[1] & results[2] > results[3]) ? 1'b1 : 1'b0 ;
+                min_max_res[3] = (results[3] > results[0] & results[3] > results[1] & results[3] > results[2]) ? 1'b1 : 1'b0 ;
+            end
+            endcase
+        end 
+    end
+
+    always_ff @(posedge(clk_i)) begin
+        if(res_valid) begin
+            if(comp_instr[0] == min | comp_instr[0] == max) begin
+                decision_result <= min_max_res ;
+            end else begin
+                decision_result <= comp_res ;
+            end
+            if(irq_en) begin
+                if (comparator_bypass) begin
+                    irq_o <= 1'b1 ;
+                end else begin
+                    irq_o <= (decision_result != 0) ? 1'b1 : 1'b0 ;
+                end
+            end
+        end else begin
+            irq_o <= 1'b0 ;
+        end
+    end 
+
+
+    // controle machine
+
+    typedef enum int { 
+        Inference, 
+        Writting, 
+        Writing_seeds
+    } inference_write_e;
+
+    inference_write_e inference_write ;
+
+    typedef enum int { 
+        Idle,
+        Read_cycles,
+        Run_stoch, 
+        Inf_cycles,
+        Read_out,
+        Run_log,
+        Done
+     } inference_state_e;
+
+    inference_state_e inference_state ; 
+
+    typedef enum int { 
+        SL_WL_rise,
+        Sl_fall,
+        WL_high,
+        WLfall
+    } read_state_e ;
+
+    read_state_e read_state ;
+
+    typedef enum int { 
+        seed_1,
+        seed_2,
+        seed_3,
+        seed_4, 
+        seed_done
+    } seed_write_state_e ;
+
+    seed_write_state_e seed_write_state ;
+
+    always_ff @( posedge(clk_i) ) begin : Inference_machine
+        if(reset_n) begin
+        // interface management
+        if(req_valid_i & ready_o) begin
             case(req_addr_i)
                 ON_OFF_REG: begin 
                     if(req_wen_i) begin
@@ -94,9 +226,10 @@ module fraise_top  #(
                 end 
                 SEED_REG: begin 
                     if(req_wen_i) begin
-                        seeds <= req_wdata_i[2**Nword_used-1:0];
+                        seeds <= req_wdata_i;
+                        new_seeds <= 1'b1 ;
                     end 
-                    device_read_data = {24'b0, seeds} ;
+                    device_read_data = seeds ;
                 end
                 OBS_REG_1: begin 
                     if(req_wen_i) begin
@@ -162,10 +295,28 @@ module fraise_top  #(
                     end 
                     device_read_data = {31'b0, comparator_bypass} ;
                 end
+                INFERENCE_WRITE_REG: begin
+                    if(req_wen_i) begin
+                        inference_write <= inference_write_e'(req_wdata_i[1:0]) ;
+                    end 
+                    device_read_data = inference_write ;
+                end
+                WRITING_SET_RESET: begin
+                    if(req_wen_i)begin
+                        set_reset <= req_wdata_i[0] ;
+                    end
+                end
                 default: begin
-                    `ifdef VERILATOR 
-                        $display("FRAISE ERROR : addres out of range of the memory : %h", req_addr_i);
-                    `endif
+                    if(req_addr_i >= MEM_ARRAY_START & req_addr_i <= MEM_ARRAY_END) begin
+                        device_read_data = '0 ; // not able to read for now
+                        data_to_write <= req_wdata_i ;
+                        write_addr <= req_addr_i ;
+                        write_en <= 'b1 ; 
+                    end else begin
+                        `ifdef VERILATOR 
+                            $display("FRAISE ERROR : address out of range of the memory : %h", req_addr_i);
+                        `endif
+                    end
                 end
             endcase
             resp_valid_o <= 1'b1; 
@@ -175,175 +326,222 @@ module fraise_top  #(
         end else begin          
             resp_valid_o <= 1'b0;
         end
-    end
-
-    // irq management
-    localparam int unsigned res_size = 2**Nword_used;
-
-    logic [MatrixSize-1:0] decision_result ; 
-    logic comparator_bypass ; 
-
-    logic [MatrixSize-1:0] comp_res ; 
-    logic [MatrixSize-1:0][res_size-1:0] comp_precision ; // only usefull for == test 
-    logic [MatrixSize-1:0][res_size-1:0] comp_reference ; 
-    logic [MatrixSize-1:0][res_size-1:0] comp_instr; 
-
-    genvar i ;
-    generate
-        for (i = 0; i< MatrixSize ; i = i+1) begin
-            comparator #(.DataWidth(2**Nword_used)) u_comp (
-                .instruction(comp_instr[i]),
-                .op_a(results[i]),
-                .op_b(comp_reference[i]),
-                .op_precision(comp_precision[i]),
-                .result(comp_res[i])
-            ) ; 
-        end
-    endgenerate
-
-    logic [MatrixSize-1:0] min_max_res ; 
-
-    always_comb begin
-        if(res_valid) begin
-            /* verilator lint_off CASEINCOMPLETE */
-            case(comp_instr[0])
-            min: begin
-                min_max_res[0] = (results[0] < results[1] & results[0] < results[2] & results[0] < results[3]) ? 1'b1 : 1'b0 ;
-                min_max_res[1] = (results[1] < results[0] & results[1] < results[2] & results[1] < results[3]) ? 1'b1 : 1'b0 ;
-                min_max_res[2] = (results[2] < results[0] & results[2] < results[1] & results[2] < results[3]) ? 1'b1 : 1'b0 ;
-                min_max_res[3] = (results[3] < results[0] & results[3] < results[1] & results[3] < results[2]) ? 1'b1 : 1'b0 ; 
-            end
-            max: begin
-                min_max_res[0] = (results[0] > results[1] & results[0] > results[2] & results[0] > results[3]) ? 1'b1 : 1'b0 ;
-                min_max_res[1] = (results[1] > results[0] & results[1] > results[2] & results[1] > results[3]) ? 1'b1 : 1'b0 ;
-                min_max_res[2] = (results[2] > results[0] & results[2] > results[1] & results[2] > results[3]) ? 1'b1 : 1'b0 ;
-                min_max_res[3] = (results[3] > results[0] & results[3] > results[1] & results[3] > results[2]) ? 1'b1 : 1'b0 ;
-            end
-            endcase
-        end 
-    end
-
-    always_ff @(posedge(clk_i)) begin
-        if(res_valid) begin
-            if(comp_instr[0] == min | comp_instr[0] == max) begin
-                decision_result <= min_max_res ;
-            end else begin
-                decision_result <= comp_res ;
-            end
-            if(irq_en) begin
-                if (comparator_bypass) begin
-                    irq_o <= 1'b1 ;
-                end else begin
-                    irq_o <= (decision_result != 0) ? 1'b1 : 1'b0 ;
-                end
-            end
-        end else begin
-            irq_o <= 1'b0 ;
-        end
-    end 
-
-
-    // inference 
-
-    typedef enum int { 
-        Idle,
-        Read_cycles,
-        Run_stoch, 
-        Read_out,
-        Run_log,
-        Done
-     } inference_state_e;
-
-    inference_state_e inference_state ; 
-
-    typedef enum int { 
-        SL_WL_rise,
-        Sl_fall,
-        WLfall
-    } read_state_e ;
-
-    read_state_e read_state ;
-
-    always_ff @( posedge(clk_i) ) begin : Inference_machine
-        
-        case(inference_state)
-            Idle: begin
-                read_state <= SL_WL_rise ;
-                counter <= '0 ;
-                counter_run_reset <= '0 ;
-                if(ON_OFF_reg == On | launch_reg == '1) begin
-                    inference_state <= Read_cycles;
-                    read_8 <= '1 ;
-                end 
-            end
-            Read_cycles: begin
-                ready_o <= '0 ; 
-                launch_reg <= '0 ; 
-                stoch_log <= mode ;
-                inference <= '1 ;
-                addr_col = {counter[1:0],Observation_vec[counter[1:0]][2:0] ,3'b0} ; 
-                addr_row = {2'b0, Observation_vec[counter[1:0]][ArraySizeLog2 + 3 - 1:3]} ;
-                case (read_state)
-                    SL_WL_rise : begin
-                        WL_signal <= '1 ;
-                        SL_signal <= '1 ;
-                        read_state <= Sl_fall ;
+        // inference
+        case (inference_write)
+            Inference: begin        
+            case(inference_state)
+                Idle: begin
+                    read_state <= SL_WL_rise ;
+                    counter <= '0 ;
+                    counter_run_reset <= '0 ;
+                    if(ON_OFF_reg == On | launch_reg == '1) begin
+                        inference_state <= Read_cycles;
                     end 
-                    Sl_fall : begin
-                        SL_signal <= '0 ;
-                        read_state <= WLfall ;
-                    end
-                    WLfall : begin
-                        WL_signal <= '0 ;
-                        read_state <= SL_WL_rise ;
-                        if(counter == 8'(MatrixSize-1)) begin
-                            inference_state <= (mode == 0) ? Run_stoch : Read_out ;
-                            counter_run_en <= '1 ;
+                end
+                Read_cycles: begin
+                    ready_o <= '0 ;
+                    read_8 <= '1 ;
+                    launch_reg <= '0 ; 
+                    stoch_log <= mode ;
+                    inference <= '0 ;
+                    addr_col = {counter[1:0],Observation_vec[counter[1:0]][2:0] ,3'b0} ; 
+                    addr_row = {2'b0, Observation_vec[counter[1:0]][ArraySizeLog2 + 3 - 1:3]} ;
+                    case (read_state)
+                        SL_WL_rise : begin
+                            WL_signal <= '1 ;
+                            SL_signal <= '1 ;
+                            read_state <= Sl_fall ;
                         end 
-                        counter <= counter + 1 ;
+                        Sl_fall : begin
+                            SL_signal <= '0 ;
+                            read_state <= WL_high ;
+                        end
+                        WL_high : begin
+                            WL_signal <= '1 ;
+                            read_state <= WLfall ;
+                        end
+                        WLfall : begin
+                            WL_signal <= '0 ;
+                            read_state <= SL_WL_rise ;
+                            if(counter == 8'(MatrixSize-1)) begin
+                                inference_state <= (mode == 0) ? Run_stoch : Inf_cycles ;
+                                counter_run_en <= '1 ;
+                            end 
+                            counter <= counter + 1 ;
+                        end
+                    endcase
+                    
+                end
+                Run_stoch: begin
+
+                    results[0] <= results[0] + 8'(bit_out[0]) ;
+                    results[1] <= results[1] + 8'(bit_out[1]) ;
+                    results[2] <= results[2] + 8'(bit_out[2]) ;
+                    results[3] <= results[3] + 8'(bit_out[3]) ;
+
+                    if(counter_run >= (2**8)-1) begin
+                        counter_run_en <= '0 ;
+                        inference_state <= Done;
+                    end 
+                end
+                Inf_cycles: begin
+                    inference <= '1 ;
+                    read_8 <= '0 ;
+                    if(counter_run >= 1) begin
+                        inference_state <= Read_out ;
                     end
-                endcase
-                
+                end
+                Read_out:begin
+                    read_out <= '1 ;
+                    inference <= '1 ;
+                    read_8 <= '0 ;
+                    if(counter_run >= 5) begin
+                        inference_state <= Run_log ;
+                    end
+                end
+                Run_log: begin
+                    inference <= '1 ;
+                    read_out <= '1 ;
+                    results[0] <= results[0] | ({7'b0, bit_out[0]} << (7-(counter_run-6))) ;
+                    results[1] <= results[1] | ({7'b0, bit_out[1]} << (7-(counter_run-6))) ;
+                    results[2] <= results[2] | ({7'b0, bit_out[2]} << (7-(counter_run-6))) ;
+                    results[3] <= results[3] | ({7'b0, bit_out[3]} << (7-(counter_run-6))) ;
+
+                    if(counter_run >= 13) begin
+                        counter_run_en <= '0 ;
+                        inference_state <= Done;
+                    end
+                end
+                Done: begin
+                    inference <= '0 ;
+                    ready_o <= '1 ;
+                    read_8 <= '0 ;
+                    read_out <= '0 ;
+                    inference <= '0 ;
+                    counter_run_reset <= '1 ;
+                    res_valid <= '1 ; 
+                    inference_state <= Idle;
+                end
+            endcase
             end
-            Run_stoch: begin
+            
 
-                results[0] <= results[0] + 8'(bit_out[0]) ;
-                results[1] <= results[1] + 8'(bit_out[1]) ;
-                results[2] <= results[2] + 8'(bit_out[2]) ;
-                results[3] <= results[3] + 8'(bit_out[3]) ;
-
-                if(counter_run >= (2**8)-1) begin
-                    counter_run_en <= '0 ;
-                    inference_state <= Done;
+            Writting:begin
+                if(write_en) begin
+                CBLEN <= '1 ;
+                load_mem <= '1 ;
+                read_1 <= '0 ;
+                read_8 <= '0 ;
+                inference <= '0 ;
+                addr_col = {write_addr[ArraySizeLog2 + MatrixSizeLog2 + MatrixSizeLog2 : (ArraySizeLog2 + MatrixSizeLog2)], write_counter[4:0]} ; 
+                addr_row = write_addr[ArraySizeLog2 + MatrixSizeLog2 - 1: 0] ;
+                if(write_state == set_CSL) begin
+                    internal_write_counter <= '0 ;
+                end else begin
+                    internal_write_counter <= internal_write_counter + 1 ;
+                end
+                case(write_state) 
+                    set_CSL: begin
+                        ready_o <= '0 ;
+                        SL_signal <= set_reset ; 
+                        write_state <= set_CBL ;
+                    end
+                    set_CBL: begin
+                        CBL <= !(data_to_write[write_counter]); 
+                        if (internal_write_counter == 2) begin
+                            write_state <= set_CWL ;
+                        end
+                    end
+                    set_CWL:begin
+                        WL_signal <= '1 ; 
+                        write_state <= reset_CWL ; 
+                    end
+                    reset_CWL:begin
+                        WL_signal <= '0 ; 
+                        if (internal_write_counter == 5) begin
+                            write_state <= loop ;
+                        end
+                    end
+                    loop:begin
+                        if(write_counter == 31) begin
+                            write_en <= '0 ;
+                            load_mem <= '0 ;
+                            CBLEN <= '0 ;
+                            write_counter <= '0 ;
+                            internal_write_counter <= '0 ;
+                            inference_state <= Idle ;
+                            ready_o <= '1 ;
+                        end else begin
+                            write_counter <= write_counter + 1 ;
+                            internal_write_counter <= '0 ;
+                            write_state <= set_CSL ;
+                        end
+                    end
+                endcase               
                 end 
             end
-            Read_out:begin
-                read_out <= '1 ;
-                inference <= '0 ;
-                inference_state <= Run_log ;
-            end
-            Run_log: begin
+            Writing_seeds: begin
+                if(new_seeds) begin
+                    case (seed_write_state)
+                        seed_1:begin
+                            ready_o <= '0 ;
+                            addr_col = '0;
+                            addr_row = '0 ;
+                            seed_input <= seeds[7:0] ;
+                            load_seed <= '1 ;
+                            seed_write_state <= seed_2 ;
+                        end 
+                        seed_2:begin
+                            addr_col = 8'b01 << 6 ;
+                            addr_row = '0 ;
+                            seed_input <= seeds[15:8] ;
+                            load_seed <= '1 ;
+                            seed_write_state <= seed_3 ;
+                        end
+                        seed_3:begin
+                            addr_col = 8'b10 << 6 ;
+                            addr_row = '0 ;
+                            seed_input <= seeds[23:16] ;
+                            load_seed <= '1 ;
+                            seed_write_state <= seed_4 ;
+                        end
+                        seed_4:begin
+                            addr_col = 8'b11 << 6 ;
+                            addr_row = '0 ;
+                            seed_input <= seeds[31:24] ;
+                            load_seed <= '1 ;
+                            seed_write_state <= seed_done ;
+                        end
+                        seed_done: begin
+                            load_seed <= '0 ;
+                            ready_o <= '1 ;
+                            seed_write_state <= seed_1 ;
+                            new_seeds <= '0 ;
+                        end
+                    endcase
 
-                results[0] <= results[0] | ({7'b0, bit_out[0]} << counter) ;
-                results[1] <= results[1] | ({7'b0, bit_out[1]} << counter) ;
-                results[2] <= results[2] | ({7'b0, bit_out[2]} << counter) ;
-                results[3] <= results[3] | ({7'b0, bit_out[3]} << counter) ;
-
-                if(counter_run >= 7) begin
-                    counter_run_en <= '0 ;
-                    inference_state <= Done;
                 end
             end
-            Done: begin
-                ready_o <= '1 ;
-                read_8 <= '0 ;
-                read_out <= '0 ;
-                inference <= '0 ;
-                counter_run_reset <= '1 ;
-                res_valid <= '1 ; 
-                inference_state <= Idle;
-            end
+
         endcase
+        end else begin
+            inference_state <= Idle;
+            read_state <= SL_WL_rise ; 
+            inference_write <= Inference ;
+            counter <= '0 ;
+            write_counter <= '0 ;
+            counter_run_reset <= '0 ;
+            counter_run_en <= '0 ;
+            res_valid <= '0 ;
+            ready_o <= '1 ;
+            load_seed <= '0 ;
+            inference <= '0 ;
+            read_1 <= '0 ;
+            read_8 <= '0 ;
+            load_mem <= '0 ;
+            read_out <= '0 ;
+        
+        end
     end
 
     // counter 
@@ -376,19 +574,18 @@ module fraise_top  #(
         end
     end
 
-
-
-
     // interface with Bayesian_stoch_log TODO: add a proper interface 
 
     logic [ArraySizeLog2 + MatrixSizeLog2 -1 :0] addr_col ;
     logic [ArraySizeLog2 + MatrixSizeLog2 -1 :0] addr_row ; 
     logic stoch_log, inference, load_seed, read_1, read_8, load_mem, read_out ;
-    logic [2**Nword_used-1:0] seeds ; 
+    logic [DataWidth-1:0] seeds ; 
+    logic [2**Nword_used -1 :0] seed_input ;
     logic [MatrixSize-1:0] bit_out ;
     logic CBL, CBLEN ; 
     logic WL_signal, SL_signal, precharge_en ;
-    
+
+    `ifdef VERILATOR // not on chip 
     Bayesian_stoch_log #(
         .Narray(MatrixSizeLog2),
         .Nword(ArraySizeLog2),
@@ -410,34 +607,8 @@ module fraise_top  #(
         .adr_full_col(addr_col),
         .adr_full_row(addr_row),
         .stoch_log(stoch_log), 
-        .seeds(seeds),
+        .seeds(seed_input),
         .bit_out(bit_out)
     ) ; 
-    
-    // reset management 
-
-    always_ff @(posedge(clk_i)) begin : Reset_management
-        if(!reset_n) begin
-            inference_state <= Idle;
-            counter <= '0 ;
-            counter_run_reset <= '0 ;
-            counter_run_en <= '0 ;
-            ON_OFF_reg <= Off ;
-            launch_reg <= '0 ;
-            res_valid <= '0 ;
-            ready_o <= '1 ;
-            load_seed <= '0 ;
-            inference <= '0 ;
-            load_seed <= '0 ;
-            read_1 <= '0 ;
-            read_8 <= '0 ;
-            load_mem <= '0 ;
-            read_out <= '0 ;
-            obs_reg_1 <= '0 ;
-            obs_reg_2 <= '0 ;
-        end
-    end
-
-
-
+    `endif 
 endmodule
