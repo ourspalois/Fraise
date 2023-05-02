@@ -28,7 +28,19 @@ module fraise_top  #(
     input logic resp_ready_i, // to tell if the network is ready for a response
     output logic [DataWidth-1:0] resp_data_o, // the data read
     output logic [NbrHostsLog2-1:0] resp_ini_addr_o ,// the adress of the initiator of the request
-    output logic irq_o // interrupt signal
+    output logic irq_o, // interrupt signal
+
+    //master interface
+    output logic Host_req_valid,
+    output logic Host_req_ready, 
+    input logic Host_gnt, 
+    output logic [DataWidth-1:0] Host_tgt_addr,
+    output logic Host_wen, 
+    output logic [DataWidth/8 - 1 :0] Host_ben,
+    output logic [DataWidth-1:0] Host_wdata,
+    input logic Host_resp_valid, 
+    output logic Host_resp_ready,
+    input logic [DataWidth-1:0] Host_resp_data,
 ) ;
     //pkg 
     import comparator_pkg::*;
@@ -183,8 +195,9 @@ module fraise_top  #(
 
     typedef enum int { 
         Idle,
-        Read_cycles,
+        Read_cycles_stoch,
         Run_stoch, 
+        Read_cycles_log,
         Inf_cycles,
         Read_out,
         Run_log,
@@ -335,10 +348,11 @@ module fraise_top  #(
                     counter <= '0 ;
                     counter_run_reset <= '0 ;
                     if(ON_OFF_reg == On | launch_reg == '1) begin
-                        inference_state <= Read_cycles;
+                        inference_state <= (mode==0) ? Read_cycles_stoch : Read_cycles_log ;
+                        results <= '0 ;
                     end 
                 end
-                Read_cycles: begin
+                Read_cycles_log: begin
                     ready_o <= '0 ;
                     read_8 <= '1 ;
                     launch_reg <= '0 ; 
@@ -364,7 +378,7 @@ module fraise_top  #(
                             WL_signal <= '0 ;
                             read_state <= SL_WL_rise ;
                             if(counter == 8'(MatrixSize-1)) begin
-                                inference_state <= (mode == 0) ? Run_stoch : Inf_cycles ;
+                                inference_state <= Inf_cycles ;
                                 counter_run_en <= '1 ;
                             end 
                             counter <= counter + 1 ;
@@ -372,14 +386,49 @@ module fraise_top  #(
                     endcase
                     
                 end
-                Run_stoch: begin
+                Read_cycles_stoch: begin
+                    launch_reg <= '0 ;
+                    ready_o <= '0 ;
+                    stoch_log <= mode ; 
+                    inference <= '0 ;
+                    read_1 <= '1 ;
+                    addr_col = {counter[1:0],Observation_vec[counter[1:0]][2:0] ,3'b0} ; 
+                    addr_row = {2'b0, Observation_vec[counter[1:0]][ArraySizeLog2 + 3 - 1:3]} ;
+                    case (read_state)
+                        SL_WL_rise : begin
+                            WL_signal <= '1 ;
+                            SL_signal <= '1 ;
+                            read_state <= Sl_fall ;
+                        end 
+                        Sl_fall : begin
+                            SL_signal <= '0 ;
+                            read_state <= WL_high ;
+                        end
+                        WL_high : begin
+                            WL_signal <= '1 ;
+                            read_state <= WLfall ;
+                        end
+                        WLfall : begin
+                            WL_signal <= '0 ;
+                            read_state <= SL_WL_rise ;
+                            if(counter == 8'(MatrixSize-1)) begin
+                                inference_state <= Run_stoch ;
+                                counter_run_en <= '1 ;
+                            end 
+                            counter <= counter + 1 ;
+                        end
+                    endcase
 
+                end
+                Run_stoch: begin
+                    read_1 <= '0 ;
+                    inference <= '1 ;
                     results[0] <= results[0] + 8'(bit_out[0]) ;
                     results[1] <= results[1] + 8'(bit_out[1]) ;
                     results[2] <= results[2] + 8'(bit_out[2]) ;
                     results[3] <= results[3] + 8'(bit_out[3]) ;
 
-                    if(counter_run >= (2**8)-1) begin
+                    if(counter_run >= (2**(2**Nword_used))-1) begin
                         counter_run_en <= '0 ;
                         inference_state <= Done;
                     end 
@@ -471,6 +520,7 @@ module fraise_top  #(
                             internal_write_counter <= '0 ;
                             inference_state <= Idle ;
                             ready_o <= '1 ;
+                            write_state <= set_CSL ;
                         end else begin
                             write_counter <= write_counter + 1 ;
                             internal_write_counter <= '0 ;
