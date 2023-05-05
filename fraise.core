@@ -16,6 +16,7 @@ filesets:
     files: 
       - rtl/fraise_top.sv
       - rtl/comparator.sv
+      - rtl/timer.sv
     file_type: systemVerilogSource
 
 targets: 

@@ -31,16 +31,16 @@ module fraise_top  #(
     output logic irq_o, // interrupt signal
 
     //master interface
-    output logic Host_req_valid,
-    output logic Host_req_ready, 
-    input logic Host_gnt, 
-    output logic [DataWidth-1:0] Host_tgt_addr,
-    output logic Host_wen, 
-    output logic [DataWidth/8 - 1 :0] Host_ben,
-    output logic [DataWidth-1:0] Host_wdata,
-    input logic Host_resp_valid, 
-    output logic Host_resp_ready,
-    input logic [DataWidth-1:0] Host_resp_data,
+    output logic Host_req_valid_o,
+    input logic Host_req_ready_i, 
+    input logic Host_gnt_i, 
+    output logic [DataWidth-1:0] Host_tgt_addr_o,
+    output logic Host_wen_o, 
+    output logic [DataWidth/8 - 1 :0] Host_ben_o,
+    output logic [DataWidth-1:0] Host_wdata_o,
+    input logic Host_resp_valid_i, 
+    output logic Host_resp_ready_o,
+    input logic [DataWidth-1:0] Host_resp_data_i
 ) ;
     //pkg 
     import comparator_pkg::*;
@@ -68,11 +68,16 @@ module fraise_top  #(
     localparam int unsigned COMP_BYPASS = 32'h034 + REG_START ;
     localparam int unsigned INFERENCE_WRITE_REG = 32'h038 + REG_START ;
     localparam int unsigned WRITING_SET_RESET = 32'h03C + REG_START ;
+    localparam int unsigned HOST_EN = 32'h040 + REG_START ;
+    localparam int unsigned OBS_ADDR_1 = 32'h044 + REG_START ;
+    localparam int unsigned OBS_ADDR_2 = 32'h048 + REG_START ;
+    localparam int unsigned OBS_ADDR_3 = 32'h04C + REG_START ;
+    localparam int unsigned OBS_ADDR_4 = 32'h050 + REG_START ;
 
     localparam int unsigned MEM_ARRAY_START = 32'h800 ; // word size of this is 32 bits
     localparam int unsigned MEM_ARRAY_END = 32'hFFF ;
 
-
+    logic [MatrixSize-1:0] new_obs ;
     logic [DataWidth-1:0] device_read_data;
 
     // broadcast byte enable to the 32 bits
@@ -182,6 +187,17 @@ module fraise_top  #(
         end
     end 
 
+    typedef enum int { 
+            Host_idle,
+            Host_send_request,
+            Host_get_response
+    } Host_managment_state_e ;
+
+    Host_managment_state_e  Host_state ; 
+    logic Host_en ; 
+    logic [7:0] obs_index ;
+
+    logic [MatrixSize-1:0][AddrWidth-1:0] Obs_address ; // TODO: 
 
     // controle machine
 
@@ -317,6 +333,31 @@ module fraise_top  #(
                 WRITING_SET_RESET: begin
                     if(req_wen_i)begin
                         set_reset <= req_wdata_i[0] ;
+                    end
+                end
+                HOST_EN:begin
+                    if(req_wen_i)begin
+                        Host_en <= req_wdata_i[0] ;
+                    end
+                end
+                OBS_ADDR_1:begin
+                    if(req_wen_i)begin
+                        Obs_address[0] <= req_wdata_i ;
+                    end
+                end
+                OBS_ADDR_2:begin
+                    if(req_wen_i)begin
+                        Obs_address[1] <= req_wdata_i ;
+                    end
+                end
+                OBS_ADDR_3:begin
+                    if(req_wen_i)begin
+                        Obs_address[2] <= req_wdata_i ;
+                    end
+                end
+                OBS_ADDR_4:begin
+                    if(req_wen_i)begin
+                        Obs_address[3] <= req_wdata_i ;
                     end
                 end
                 default: begin
@@ -473,8 +514,6 @@ module fraise_top  #(
                 end
             endcase
             end
-            
-
             Writting:begin
                 if(write_en) begin
                 CBLEN <= '1 ;
@@ -572,8 +611,50 @@ module fraise_top  #(
 
                 end
             end
-
         endcase
+        // Host side control 
+        case (Host_state)
+            Host_idle: begin
+                Host_req_valid_o <= '0 ;
+                Host_resp_ready_o <= '0 ;
+                if(Host_en & (new_obs != '0)) begin
+                    Host_state <= Host_send_request ;
+                end
+             end
+            Host_send_request: begin
+                if(Host_req_ready_i) begin
+                    case ({4'b0, new_obs})
+                        1: obs_index = 0 ;
+                        2: obs_index = 1 ;
+                        4: obs_index = 2 ;
+                        8: obs_index = 3 ;
+                        default: obs_index = 0 ;
+                    endcase  
+                    Host_req_valid_o <= '1 ;
+                    Host_tgt_addr_o <= Obs_address[obs_index] ;
+                    Host_wen_o <= '0 ;
+                    Host_ben_o <= 4'b1111;
+                    Host_wdata_o <= '0 ;
+                    if(Host_gnt_i == '1) begin
+                        Host_state <= Host_get_response ;
+                    end
+                end                   
+            end
+            Host_get_response: begin
+                Host_req_valid_o <= '0 ;
+                   Host_tgt_addr_o <= '0 ;
+                Host_resp_ready_o <= '1 ;
+                if(Host_resp_valid_i == '1) begin
+                    case (obs_index)
+                        1 : obs_reg_1[8:0] <= Host_resp_data_i[8:0] ;
+                        2 : obs_reg_1[17:9] <= Host_resp_data_i[8:0] ;
+                        3 : obs_reg_2[8:0] <= Host_resp_data_i[8:0] ;
+                        4 : obs_reg_2[17:9] <= Host_resp_data_i[8:0] ;
+                    endcase
+                    Host_state <= Host_idle ;
+                end
+            end
+            endcase
         end else begin
             inference_state <= Idle;
             read_state <= SL_WL_rise ; 
@@ -590,7 +671,10 @@ module fraise_top  #(
             read_8 <= '0 ;
             load_mem <= '0 ;
             read_out <= '0 ;
-        
+            Host_state <= Host_idle ;
+            Host_en <= '0 ;
+            obs_index = '0 ;
+            Obs_address <= '0 ;
         end
     end
 
@@ -624,6 +708,26 @@ module fraise_top  #(
         end
     end
 
+    // check new obs (timer based now) 
+    logic timer_pulse ;
+
+    timer_obs #(.SIZE(DataWidth), .STOP(32'(1<<25))) utimer_obs (
+        .clk(clk_i),
+        .rst(reset_n),
+        .en(Host_en), 
+        .pulse(timer_pulse)
+    ) ;
+
+    always_ff @( posedge(clk_i) ) begin : obs_new_control
+        if(timer_pulse) begin
+            if(new_obs == '0) begin
+                new_obs = '1 ;
+            end else begin
+                new_obs = new_obs << 1 ;
+            end
+        end
+    end
+
     // interface with Bayesian_stoch_log TODO: add a proper interface 
 
     logic [ArraySizeLog2 + MatrixSizeLog2 -1 :0] addr_col ;
@@ -636,29 +740,29 @@ module fraise_top  #(
     logic WL_signal, SL_signal, precharge_en ;
 
     `ifdef VERILATOR // not on chip 
-    Bayesian_stoch_log #(
-        .Narray(MatrixSizeLog2),
-        .Nword(ArraySizeLog2),
-        .Nword_used(Nword_used)
-    ) e_Bayesian_stoch_log (
-        .clk(clk_i),
-        .CBL(CBL),
-        .CBLEN(CBLEN), // 1 when pcsa connected 0 when not
-        .CSL(SL_signal), // 1 when CWlen IS ENABLED 
-        .CWL(WL_signal),  
+        Bayesian_stoch_log #(
+            .Narray(MatrixSizeLog2),
+            .Nword(ArraySizeLog2),
+            .Nword_used(Nword_used)
+        ) e_Bayesian_stoch_log (
+            .clk(clk_i),
+            .CBL(CBL),
+            .CBLEN(CBLEN), // 1 when pcsa connected 0 when not
+            .CSL(SL_signal), // 1 when CWlen IS ENABLED 
+            .CWL(WL_signal),  
 
-        .inference(inference),
-        .load_seed(load_seed),
-        .read_1(read_1),
-        .read_8(read_8), // put t 1 for 8 bits 
-        .load_mem(load_mem),
-        .read_out(read_out),
-        
-        .adr_full_col(addr_col),
-        .adr_full_row(addr_row),
-        .stoch_log(stoch_log), 
-        .seeds(seed_input),
-        .bit_out(bit_out)
-    ) ; 
+            .inference(inference),
+            .load_seed(load_seed),
+            .read_1(read_1),
+            .read_8(read_8), // put t 1 for 8 bits 
+            .load_mem(load_mem),
+            .read_out(read_out),
+            
+            .adr_full_col(addr_col),
+            .adr_full_row(addr_row),
+            .stoch_log(stoch_log), 
+            .seeds(seed_input),
+            .bit_out(bit_out)
+        ) ; 
     `endif 
 endmodule
