@@ -1,0 +1,30 @@
+CAPI=2:
+
+# Copyright INTEGNANO University of Paris-Saclay, 2023 
+# written by: ourspalois 
+
+name : "integnano:fraise:rtl_bayesian_machine_8_8" 
+description: "Top description of INTEGNANO's log 8*8 on chip bayesian accelerator" 
+filesets:
+  rtl_files: 
+    depend:
+        - integnano:fraise:mem_array_8_8
+    files:
+        - additions.sv
+        - array_decoder_left.sv
+        - array_decoder_top.sv
+        - Bayesian_log2.sv
+        - bot_logic.sv
+        - compteur.sv
+        - decoder_bot.sv
+        - decoder_left.sv
+        - decoder_right.sv
+        - decoder_top.sv
+        - likelihood.sv
+        - register_out.sv
+    file_type: systemVerilogSource
+
+targets:
+  default:
+    filesets:
+      - rtl_files

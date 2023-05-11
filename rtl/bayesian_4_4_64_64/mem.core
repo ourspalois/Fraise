@@ -1,7 +1,7 @@
 CAPI=2:
 # Copyright INTEGNANO UNiversity of Paris-Saclay, 2023 
 # written by: ourspalois 
-name : "integnano:fraise:mem" 
+name : "integnano:fraise:mem_array_64_64" 
 description: "memfile for fraise" 
 filesets:
   memory_files:

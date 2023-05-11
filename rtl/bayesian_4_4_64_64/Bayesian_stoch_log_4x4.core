@@ -1,14 +1,14 @@
 CAPI=2:
 
-# Copyright INTEGNANO UNiversity of Paris-Saclay, 2023 
+# Copyright INTEGNANO University of Paris-Saclay, 2023 
 # written by: ourspalois 
 
-name : "integnano:fraise:rtl_bayesian_machine" 
+name : "integnano:fraise:rtl_bayesian_machine_4_4_64_64" 
 description: "Top description of INTEGNANO's stochastic log inference matrix" 
 filesets:
   rtl_files: 
     depend:
-      - integnano:fraise:mem
+      - integnano:fraise:mem_array_64_64
     files:
       - additions.sv
       - Bayesian_stoch_log.sv
