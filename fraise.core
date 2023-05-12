@@ -12,7 +12,7 @@ filesets:
 
   rtl_files:
     depend : 
-      - integnano:fraise:rtl_bayesian_machine_4_4_64_64
+      - integnano:fraise:rtl_bayesian_machine_8_8
     files: 
       - rtl/fraise_top.sv
       - rtl/comparator.sv

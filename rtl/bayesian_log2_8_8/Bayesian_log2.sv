@@ -31,7 +31,10 @@ module Bayesian_log2 #(parameter Narray = 2, Nword = 3, M = 2**Nword, N = Narray
 		adr_full_col <= adr_full_col_in;
 		adr_full_row <= adr_full_row_in;
 		CBL <= CBL0; CBLEN <= CBLEN0; CSL <= CSL0; CWL <= CWL0;
-		inference_d <= inference; read_mem_d <= read_mem; prog_d <= prog; read_out_d <= read_out;
+		inference_d <= inference; 
+		read_mem_d <= read_mem; 
+		prog_d <= prog; 
+		read_out_d <= read_out;
 	end
 
 // decode instructions 
@@ -59,7 +62,7 @@ module Bayesian_log2 #(parameter Narray = 2, Nword = 3, M = 2**Nword, N = Narray
 				  		reg_lrs);
 
 //  generate Likelihoods Array 
-
+	/* verilator lint_off UNOPTFLAT */
 	wire [2**Nword-1:0] DATA_next [2**Narray:1][2**Narray:0]; // 
 	assign DATA_next[1][0] = 8'b0;
 	assign DATA_next[2][0] = 8'b0;

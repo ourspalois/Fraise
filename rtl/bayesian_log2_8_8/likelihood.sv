@@ -35,8 +35,8 @@ module likelihood #(parameter Nword = 3)
 	assign DIN = read ? 8'b11111111 : 8'b0; //
 	assign DINb = 8'b0;
 
-	NEURONIC_4k_FULL_MOD rram(.CBL(CBL), .CBLEN(CBLEN), .CSL(CSL), .DIN(DIN), .DINb(DINb), .CWLE(CWLE), .CWLO(CWLO), .DATA(DATA));
-	//MC_8x8_FULL_upd rram(.CBLA(CBL), .CENA(CBLEN), .SLA(CSL), .DIN(DIN), .DINb(DINb), .CWLE(CWLE), .CWLO(CWLO), .DOUT(DATA));
+	//NEURONIC_4k_FULL_MOD rram(.CBL(CBL), .CBLEN(CBLEN), .CSL(CSL), .DIN(DIN), .DINb(DINb), .CWLE(CWLE), .CWLO(CWLO), .DATA(DATA));
+	MC_8x8_FULL_upd rram(.CBL(CBL), .CBLEN(CBLEN), .CSL(CSL), .DIN(DIN), .DINb(DINb), .CWLE(CWLE), .CWLO(CWLO), .DOUT(DATA));
 	//RRAM_array #(2**Nword,2**(Nword-1)) rram(.CBL(CBL), .CBLEN(CBLEN), .CSL(CSL), .DIN(DIN), .DINb(DINb), .CWLE(CWLE), .CWLO(CWLO), .DATA(DATA));
 
 	bot_logic_log #(2**Nword) BT_log(clk, read_out, prog, read_mem, adr_0, inference_en, DATA, DATA_prev, DATA_next);

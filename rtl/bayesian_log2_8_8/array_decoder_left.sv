@@ -18,7 +18,7 @@ module array_decoder_left #(parameter Narray = 2, Nword = 3, N = Nword + Narray)
 // Store rows registers 
 	assign reg_lrs = reg_lr;
 	always_ff @(posedge clk) begin
-		if (read_out) reg_lr <= 7'b0;
+		if (read_out) reg_lr <= '0;
 		else reg_lr <= { selected_left, CWL_in, adr_full_row[Nword-1:0]}; // 
 	end
 

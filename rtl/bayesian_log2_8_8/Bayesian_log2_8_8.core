@@ -14,7 +14,7 @@ filesets:
         - array_decoder_left.sv
         - array_decoder_top.sv
         - Bayesian_log2.sv
-        - bot_logic.sv
+        - bot_logic_log.sv
         - compteur.sv
         - decoder_bot.sv
         - decoder_left.sv
