@@ -6,7 +6,7 @@ description: "mem description file for the 8*8 array of memeristors"
 filesets:
   memory_files:
     files:
-      - MC_8*8_FULL_upd.sv
+      - MC_8x8_FULL_upd.sv
     file_type: systemVerilogSource
 
 targets:
