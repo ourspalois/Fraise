@@ -41,6 +41,18 @@ module fraise_top  #(
     input logic Host_resp_valid_i, 
     output logic Host_resp_ready_o,
     input logic [DataWidth-1:0] Host_resp_data_i
+
+    `ifndef VERILATOR
+    , output logic CBL, 
+    output logic CBLEN,
+    output logic CSL,
+    output logic CWL,
+    output logic [1:0] instructions, 
+    output logic [4-1:0] addr_col,
+    output logic [4-1:0] addr_row,
+    input logic bit_out_top [MatrixSize-1:0]
+
+    `endif
 ) ;
     //pkg 
     import comparator_pkg::*;
@@ -588,12 +600,15 @@ module fraise_top  #(
     logic [ArraySizeLog2 + MatrixSizeLog2 -1 :0] addr_col ;
     logic [ArraySizeLog2 + MatrixSizeLog2 -1 :0] addr_row ; 
     logic CBL, CBLEN ; 
+    logic CWL, CSL ; 
+    assign CWL = WL_signal ;
+    assign CSL = SL_signal ;
     logic WL_signal, SL_signal ;
     logic [1:0] instructions ; 
     logic  bit_out_1 [MatrixSize-1:0];
     logic [MatrixSize-1:0] bit_out ;
     assign bit_out = {bit_out_1[3], bit_out_1[2], bit_out_1[1], bit_out_1[0]} ;
-
+    `ifdef VERILATOR
     Bayesian_log2 #(
         .Narray(MatrixSizeLog2),
         .Nword(ArraySizeLog2)
@@ -610,7 +625,10 @@ module fraise_top  #(
         .DATA_out(bit_out_1)
 
     ) ;
-
+    `endif
+    `ifndef VERILATOR
+    assign bit_out_1 = bit_out_top ;
+    `endif
 
     // interface with Bayesian_stoch_log TODO: add a proper interface 
         /*
