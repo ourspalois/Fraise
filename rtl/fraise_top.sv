@@ -210,12 +210,14 @@ module fraise_top  #(
 
     typedef enum int { 
         Inference, 
-        Writting
+        Writting, 
+        Reading
     } inference_write_e;
 
     inference_write_e inference_write ;
+    inference_write_e old_inference_write ; 
 
-    typedef enum int { 
+    typedef enum int { // TODO: clean up this SM
         Idle,
         Read_cycles_stoch,
         Run_stoch, 
@@ -236,6 +238,12 @@ module fraise_top  #(
     } read_state_e ;
 
     read_state_e read_state ;
+
+    logic [NbrHostsLog2-1:0] read_host_addr ; 
+    logic wait_read ; 
+    logic [AddrWidth-1:0] read_addr ;
+    logic read_is_done ; 
+    logic [DataWidth-1:0] read_reg ;
 
     always_ff @( posedge(clk_i) ) begin : Inference_machine
         if(reset_n) begin
@@ -339,10 +347,17 @@ module fraise_top  #(
                 end
                 default: begin
                     if(req_addr_i >= MEM_ARRAY_START & req_addr_i <= MEM_ARRAY_END) begin
-                        device_read_data = '0 ; // not able to read for now
-                        data_to_write <= req_wdata_i ;
-                        write_addr <= req_addr_i ;
-                        write_en <= 'b1 ; 
+                        if(req_wen_i) begin
+                            data_to_write <= req_wdata_i ;
+                            write_addr <= req_addr_i ;
+                            write_en <= 'b1 ;
+                        end else begin
+                            wait_read = '1 ;
+                            read_host_addr <= req_host_addr_i; 
+                            read_addr <= req_addr_i ;
+                            old_inference_write = inference_write ; 
+                            inference_write <= Reading ; 
+                        end
                     end else begin
                         `ifdef VERILATOR 
                             $display("FRAISE ERROR : address out of range of the memory : %h", req_addr_i);
@@ -350,15 +365,96 @@ module fraise_top  #(
                     end
                 end
             endcase
-            resp_valid_o <= 1'b1; 
-            resp_ini_addr_o <= req_host_addr_i; 
-            resp_data_o <= device_read_data;
-            
+            if(wait_read == '0) begin
+                resp_valid_o <= 1'b1; 
+                resp_ini_addr_o <= req_host_addr_i; 
+                resp_data_o <= device_read_data;
+            end
+        end else if(wait_read == '1) begin
+            if(read_is_done) begin
+                resp_valid_o <= 1'b1 ;
+                resp_ini_addr_o <= read_host_addr ;
+                resp_data_o <= read_reg ;
+                wait_read = '0 ;
+                read_is_done <= '0 ;
+            end
         end else begin          
             resp_valid_o <= 1'b0;
         end
         // inference
         case (inference_write)
+            Reading: begin
+            case(inference_state)
+                Idle: begin
+                    read_state <= SL_WL_rise ;
+                    counter_run_reset <= '0 ;
+                    inference_state <= Read_cycles_log ;
+                    results <= '0 ;
+                    
+                end
+                Read_cycles_log: begin
+                    ready_o <= '0 ;
+                    launch_reg <= '0 ; 
+                    instructions <= 2'b10 ; // read_mem_mode
+                    addr_col = {read_addr[4:3], 3'b0} ; 
+                    addr_row = {read_addr[2:0], 2'b0} ;
+                    case (read_state)
+                        SL_WL_rise : begin
+                            WL_signal <= '1 ;
+                            SL_signal <= '1 ;
+                            read_state <= Sl_fall ;
+                        end 
+                        Sl_fall : begin
+                            SL_signal <= '0 ;
+                            read_state <= WL_high ;
+                        end
+                        WL_high : begin
+                            WL_signal <= '1 ;
+                            read_state <= WLfall ;
+                        end
+                        WLfall : begin
+                            WL_signal <= '0 ;
+                            read_state <= SL_WL_rise ;
+                            inference_state <= Read_out ;
+                            counter_run_en <= '1 ;
+                        end
+                    endcase
+                end
+                Read_out:begin
+                    instructions <= 2'b01 ;
+                    if(counter_run >= 3) begin
+                        inference_state <= Run_log ;
+                    end
+                end
+                Run_log: begin
+                    instructions <= 2'b01 ;
+                    case(read_addr[2:1]) 
+                        2'b00 : results[0] <= results[0] | ({7'b0, bit_out[0]} << (7-(counter_run-6))) ;
+                        2'b01 : results[1] <= results[1] | ({7'b0, bit_out[1]} << (7-(counter_run-6))) ;
+                        2'b10 : results[2] <= results[2] | ({7'b0, bit_out[2]} << (7-(counter_run-6))) ;
+                        2'b11 : results[3] <= results[3] | ({7'b0, bit_out[3]} << (7-(counter_run-6))) ;
+                    endcase
+                    if(counter_run >= 13) begin
+                        counter_run_en <= '0 ;
+                        inference_state <= Done;
+                    end
+                end
+                Done: begin
+                    inference_write <= old_inference_write ; 
+                    counter_run_reset <= '1 ;
+                    res_valid <= '1 ; 
+                    ready_o <= '1 ;
+                    inference_state <= Idle;
+                    read_is_done <= '1 ;
+                    case (read_addr[2:1])
+                        2'b00 : read_reg <= read_reg | {24'b0, results[0]} ;
+                        2'b01 : read_reg <= read_reg | {24'b0, results[1]} ;
+                        2'b10 : read_reg <= read_reg | {24'b0, results[2]} ;
+                        2'b11 : read_reg <= read_reg | {24'b0, results[3]} ;
+                    endcase ;
+                end
+            endcase
+            end
             Inference: begin        
             case(inference_state)
                 Idle: begin
@@ -401,13 +497,6 @@ module fraise_top  #(
                         end
                     endcase
                 end
-                /*
-                Inf_cycles: begin
-                    instructions <= b'00 ; // inference mode
-                    if(counter_run >= 1) begin
-                        inference_state <= Read_out ;
-                    end
-                end */
                 Read_out:begin
                     instructions <= 2'b01 ;
                     if(counter_run >= 3) begin
