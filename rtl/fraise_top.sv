@@ -243,7 +243,9 @@ module fraise_top  #(
     logic wait_read ; 
     logic [AddrWidth-1:0] read_addr ;
     logic read_is_done ; 
-    logic [DataWidth-1:0] read_reg ;
+
+    logic [2:0] count_reads ; 
+    logic [31:0] result_read ;
 
     always_ff @( posedge(clk_i) ) begin : Inference_machine
         if(reset_n) begin
@@ -357,6 +359,8 @@ module fraise_top  #(
                             read_addr <= req_addr_i ;
                             old_inference_write = inference_write ; 
                             inference_write <= Reading ; 
+                            count_reads = 0 ;
+                            result_read <= '0 ;
                         end
                     end else begin
                         `ifdef VERILATOR 
@@ -374,7 +378,7 @@ module fraise_top  #(
             if(read_is_done) begin
                 resp_valid_o <= 1'b1 ;
                 resp_ini_addr_o <= read_host_addr ;
-                resp_data_o <= read_reg ;
+                resp_data_o <= result_read ;
                 wait_read = '0 ;
                 read_is_done <= '0 ;
             end
@@ -396,8 +400,8 @@ module fraise_top  #(
                     ready_o <= '0 ;
                     launch_reg <= '0 ; 
                     instructions <= 2'b10 ; // read_mem_mode
-                    addr_col = {read_addr[4:3], 3'b0} ; 
-                    addr_row = {read_addr[2:0], 2'b0} ;
+                    addr_col = {read_addr[4:3], read_addr[0] , count_reads[1:0] } ; 
+                    addr_row = {read_addr[2:1], 3'b0} ;
                     case (read_state)
                         SL_WL_rise : begin
                             WL_signal <= '1 ;
@@ -429,10 +433,10 @@ module fraise_top  #(
                 Run_log: begin
                     instructions <= 2'b01 ;
                     case(read_addr[2:1]) 
-                        2'b00 : results[0] <= results[0] | ({7'b0, bit_out[0]} << (7-(counter_run-6))) ;
-                        2'b01 : results[1] <= results[1] | ({7'b0, bit_out[1]} << (7-(counter_run-6))) ;
-                        2'b10 : results[2] <= results[2] | ({7'b0, bit_out[2]} << (7-(counter_run-6))) ;
-                        2'b11 : results[3] <= results[3] | ({7'b0, bit_out[3]} << (7-(counter_run-6))) ;
+                        2'b00 : result_read[count_reads*8 +: 8] <= result_read[count_reads*8 +: 8] | ({7'b0, bit_out[0]} << (7-(counter_run-6))) ;
+                        2'b01 : result_read[count_reads*8 +: 8] <= result_read[count_reads*8 +: 8] | ({7'b0, bit_out[1]} << (7-(counter_run-6))) ;
+                        2'b10 : result_read[count_reads*8 +: 8] <= result_read[count_reads*8 +: 8] | ({7'b0, bit_out[2]} << (7-(counter_run-6))) ;
+                        2'b11 : result_read[count_reads*8 +: 8] <= result_read[count_reads*8 +: 8] | ({7'b0, bit_out[3]} << (7-(counter_run-6))) ;
                     endcase
                     if(counter_run >= 13) begin
                         counter_run_en <= '0 ;
@@ -440,18 +444,14 @@ module fraise_top  #(
                     end
                 end
                 Done: begin
-                    inference_write <= old_inference_write ; 
+                    count_reads = count_reads + 1 ;
+                    if(count_reads >= 4) begin
+                        inference_write <= old_inference_write ; 
+                        read_is_done <= '1 ;
+                        ready_o <= '1 ;
+                    end
                     counter_run_reset <= '1 ;
-                    res_valid <= '1 ; 
-                    ready_o <= '1 ;
                     inference_state <= Idle;
-                    read_is_done <= '1 ;
-                    case (read_addr[2:1])
-                        2'b00 : read_reg <= read_reg | {24'b0, results[0]} ;
-                        2'b01 : read_reg <= read_reg | {24'b0, results[1]} ;
-                        2'b10 : read_reg <= read_reg | {24'b0, results[2]} ;
-                        2'b11 : read_reg <= read_reg | {24'b0, results[3]} ;
-                    endcase ;
                 end
             endcase
             end
@@ -470,8 +470,8 @@ module fraise_top  #(
                     ready_o <= '0 ;
                     launch_reg <= '0 ; 
                     instructions <= 2'b00 ; // read_mem_mode
-                    addr_col = {counter[1:0], 3'b0} ; 
-                    addr_row = {2'b0, Observation_vec[counter[1:0]]} ;
+                    addr_col = {counter[1:0], Observation_vec[counter[1:0]]} ; 
+                    addr_row = {2'b0, 3'b0 } ;
                     case (read_state)
                         SL_WL_rise : begin
                             WL_signal <= '1 ;
@@ -527,8 +527,8 @@ module fraise_top  #(
                 if(write_en) begin
                 CBLEN <= '1 ;
                 instructions <= 2'b11 ; // write mode
-                addr_col = {write_addr[4:3], write_counter[4:2]} ;
-                addr_row = {write_addr[2:0], write_counter[1:0]} ;
+                addr_col = {write_addr[4:3], write_addr[0], write_counter[4:3]} ;
+                addr_row = {write_addr[2:1], write_counter[2:0]} ;
                 if(write_state == set_CSL) begin
                     internal_write_counter <= '0 ;
                 end else begin

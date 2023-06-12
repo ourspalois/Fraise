@@ -95,12 +95,16 @@ module cell_matrix (
                 rd_en = 1'b0;
             end else begin 
                 if ((CSL == 1'b0) && (rd_en)) begin 
-                    if(memristors[0] == memristors[1]) begin 
-                        dout = 'z; // better than x for trsitate buffer
-                        rd_en = 1'b0;
-                    end else begin 
-                        dout = ~((memristors[0] && DIN) || (memristors[1] && DINb));
-                        rd_en = 1'b0;
+                    if((CWL == '0) || ((DIN == '0) && (DINb == '0)) ) begin
+                        dout = '0; 
+                    end else begin
+                        if(memristors[0] == memristors[1]) begin 
+                            dout = 'z; // better than x for trsitate buffer
+                            rd_en = 1'b0;
+                        end else begin 
+                            dout = ~((memristors[0] && DIN) || (memristors[1] && DINb));
+                            rd_en = 1'b0;
+                        end
                     end
                 end else begin 
                     if(CSL) begin 
@@ -108,7 +112,7 @@ module cell_matrix (
                     end
                 end 
             end
-        end
+        end 
     end
 
 endmodule
