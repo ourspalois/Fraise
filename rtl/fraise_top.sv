@@ -48,8 +48,8 @@ module fraise_top  #(
     output logic CSL,
     output logic CWL,
     output logic [1:0] instructions, 
-    output logic [4-1:0] addr_col,
-    output logic [4-1:0] addr_row,
+    output logic [5-1:0] addr_col,
+    output logic [5-1:0] addr_row,
     input logic bit_out_top [MatrixSize-1:0]
 
     `endif
@@ -356,7 +356,7 @@ module fraise_top  #(
                         end else begin
                             wait_read = '1 ;
                             read_host_addr <= req_host_addr_i; 
-                            read_addr <= req_addr_i ;
+                            read_addr <= req_addr_i >> 2;
                             old_inference_write = inference_write ; 
                             inference_write <= Reading ; 
                             count_reads = 0 ;
