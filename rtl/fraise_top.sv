@@ -459,6 +459,7 @@ module fraise_top  #(
             case(inference_state)
                 Idle: begin
                     read_state <= SL_WL_rise ;
+                    instructions <= 2'b00 ; 
                     counter <= '0 ;
                     counter_run_reset <= '0 ;
                     if(ON_OFF_reg == On | launch_reg == '1) begin
