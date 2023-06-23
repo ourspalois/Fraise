@@ -351,12 +351,12 @@ module fraise_top  #(
                     if(req_addr_i >= MEM_ARRAY_START & req_addr_i <= MEM_ARRAY_END) begin
                         if(req_wen_i) begin
                             data_to_write <= req_wdata_i ;
-                            write_addr <= req_addr_i ;
+                            write_addr <= req_addr_i >> 2 ;
                             write_en <= 'b1 ;
                         end else begin
                             wait_read = '1 ;
                             read_host_addr <= req_host_addr_i; 
-                            read_addr <= req_addr_i >> 2;
+                            read_addr <= req_addr_i >> 2 ;
                             old_inference_write = inference_write ; 
                             inference_write <= Reading ; 
                             count_reads = 0 ;
@@ -433,10 +433,10 @@ module fraise_top  #(
                 Run_log: begin
                     instructions <= 2'b01 ;
                     case(read_addr[2:1]) 
-                        2'b00 : result_read[count_reads*8 +: 8] <= result_read[count_reads*8 +: 8] | ({7'b0, bit_out[0]} << (7-(counter_run-6))) ;
-                        2'b01 : result_read[count_reads*8 +: 8] <= result_read[count_reads*8 +: 8] | ({7'b0, bit_out[1]} << (7-(counter_run-6))) ;
-                        2'b10 : result_read[count_reads*8 +: 8] <= result_read[count_reads*8 +: 8] | ({7'b0, bit_out[2]} << (7-(counter_run-6))) ;
-                        2'b11 : result_read[count_reads*8 +: 8] <= result_read[count_reads*8 +: 8] | ({7'b0, bit_out[3]} << (7-(counter_run-6))) ;
+                        2'b00 : result_read[count_reads*8 +: 8] <= result_read[count_reads*8 +: 8] | ({7'b0, bit_out[0]} << (7-(counter_run-5))) ;
+                        2'b01 : result_read[count_reads*8 +: 8] <= result_read[count_reads*8 +: 8] | ({7'b0, bit_out[1]} << (7-(counter_run-5))) ;
+                        2'b10 : result_read[count_reads*8 +: 8] <= result_read[count_reads*8 +: 8] | ({7'b0, bit_out[2]} << (7-(counter_run-5))) ;
+                        2'b11 : result_read[count_reads*8 +: 8] <= result_read[count_reads*8 +: 8] | ({7'b0, bit_out[3]} << (7-(counter_run-5))) ;
                     endcase
                     if(counter_run >= 13) begin
                         counter_run_en <= '0 ;
