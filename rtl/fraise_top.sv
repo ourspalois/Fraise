@@ -506,12 +506,12 @@ module fraise_top  #(
                 end
                 Run_log: begin
                     instructions <= 2'b01 ;
-                    results[0] <= results[0] | ({7'b0, bit_out[0]} << (7-(counter_run-6))) ;
-                    results[1] <= results[1] | ({7'b0, bit_out[1]} << (7-(counter_run-6))) ;
-                    results[2] <= results[2] | ({7'b0, bit_out[2]} << (7-(counter_run-6))) ;
-                    results[3] <= results[3] | ({7'b0, bit_out[3]} << (7-(counter_run-6))) ;
+                    results[0] <= results[0] | ({7'b0, bit_out[0]} << (7-(counter_run-5))) ;
+                    results[1] <= results[1] | ({7'b0, bit_out[1]} << (7-(counter_run-5))) ;
+                    results[2] <= results[2] | ({7'b0, bit_out[2]} << (7-(counter_run-5))) ;
+                    results[3] <= results[3] | ({7'b0, bit_out[3]} << (7-(counter_run-5))) ;
 
-                    if(counter_run >= 13) begin
+                    if(counter_run >= 12) begin
                         counter_run_en <= '0 ;
                         inference_state <= Done;
                     end
