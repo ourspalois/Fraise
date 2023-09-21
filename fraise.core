@@ -12,11 +12,12 @@ filesets:
 
   rtl_files:
     depend : 
-      - integnano:fraise:rtl_bayesian_machine_8_8
+      - integnano:fraise:rtl_bayesian_machine_4_4_64_64
     files: 
       - rtl/fraise_top.sv
       - rtl/comparator.sv
       - rtl/timer.sv
+      - rtl/find_first_one_stoch.sv
     file_type: systemVerilogSource
 
 targets: 

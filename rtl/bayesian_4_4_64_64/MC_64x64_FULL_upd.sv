@@ -12,6 +12,7 @@ module MC_64x64_FULL_upd (
 );
     
     logic [63:0] CWL ;
+    logic [63:0] DOUT0;
     genvar h ; 
     generate
         for(h = 0 ; h < 32 ; h = h+1) begin
@@ -29,10 +30,11 @@ module MC_64x64_FULL_upd (
                 .CSL(CSL),
                 .DIN(DIN),
                 .DINb(DINb),
-                .dout(DOUT)
+                .dout(DOUT0)
             );
         end
     endgenerate 
+    assign DOUT = 64'h0000000000000001;
     
 endmodule
 
@@ -96,7 +98,7 @@ module cell_matrix (
             end else begin 
                 if ((CSL == 1'b0) && (rd_en)) begin 
                     if(memristors[0] == memristors[1]) begin 
-                        dout = 'z; // better than x for trsitate buffer
+                        dout = 'x; // better than x for trsitate buffer
                         rd_en = 1'b0;
                     end else begin 
                         dout = ~((memristors[0] && DIN) || (memristors[1] && DINb));

@@ -1,12 +1,13 @@
 // This is the top module of the accelerator to control the bayesian array developped by INTEGNANO
 
 // author : Ourspalois, INTEGNANO, 2023
+// modification : C.Turck 2023; adaptation to Maxi Bayes (4x4 and 64x64 memory) 
 
 module fraise_top  #(
     parameter int unsigned DataWidth = 32, 
     parameter int unsigned AddrWidth = 32,
     parameter int unsigned MatrixSize = 4, // I consider them square
-    parameter int unsigned ArraySize = 8, 
+    parameter int unsigned ArraySize = 64, 
     parameter int unsigned Nword_used = 3, //on lit 8 bits a la fois 
     parameter int unsigned NbrHostsLog2 = 1 
     ) (
@@ -47,10 +48,17 @@ module fraise_top  #(
     output logic CBLEN,
     output logic CSL,
     output logic CWL,
-    output logic [1:0] instructions, 
-    output logic [5-1:0] addr_col,
-    output logic [5-1:0] addr_row,
-    input logic bit_out_top [MatrixSize-1:0]
+    output logic  inference, // Activation de l'inférence
+    output logic  load_seed, // Chargement des seeds
+    output logic  read_1, // Lecture de 1 bit
+    output logic  read_8, // Lecture de 8 bits
+    output logic  load_mem, // Programmation de la mémoire
+    output logic  read_out, // Envoi de la sortie de lecture ou d'inférence 
+    output logic  stoch_log, // Mode de calcul stochastique ou logarithmique
+    output logic  [7:0] seeds, // Seeds pour le calcul stochastique
+    output logic [7:0] addr_col,
+    output logic [7:0] addr_row,
+    input logic bit_out [MatrixSize-1:0]
 
     `endif
 ) ;
@@ -63,29 +71,22 @@ module fraise_top  #(
     
 
     // the accelerator resgisters adresses. 
-    localparam int unsigned REG_START = 32'h00010 ; 
-    localparam int unsigned ON_OFF_REG = 32'h000 + REG_START ; // 0 iddle, 1 inference (continuous)
-    localparam int unsigned OBS_REG_1 = 32'h008 + REG_START ;
-    localparam int unsigned OBS_REG_2 = 32'h00C + REG_START ;
-    localparam int unsigned LAUNCH_REG = 32'h010 + REG_START ;
-    localparam int unsigned RES_VALID_REG = 32'h014 + REG_START ;
-    localparam int unsigned RES_REG = 32'h018 + REG_START ;
-    localparam int unsigned IRQ_EN_REG = 32'h020 + REG_START ; // 0 : no irq, 1 : irq when res is valid
-    localparam int unsigned PRECISION_REG = 32'h024 + REG_START ; 
-    localparam int unsigned COMP_INSTRUCTION_REG = 32'h028 + REG_START ;
-    localparam int unsigned COMP_REFERENCE = 32'h02C + REG_START ;
-    localparam int unsigned COMP_RESULT = 32'h030 + REG_START ;
-    localparam int unsigned COMP_BYPASS = 32'h034 + REG_START ;
-    localparam int unsigned INFERENCE_WRITE_REG = 32'h038 + REG_START ;
-    localparam int unsigned WRITING_SET_RESET = 32'h03C + REG_START ;
-    localparam int unsigned HOST_EN = 32'h040 + REG_START ;
-    localparam int unsigned OBS_ADDR_1 = 32'h044 + REG_START ;
-    localparam int unsigned OBS_ADDR_2 = 32'h048 + REG_START ;
-    localparam int unsigned OBS_ADDR_3 = 32'h04C + REG_START ;
-    localparam int unsigned OBS_ADDR_4 = 32'h050 + REG_START ;
+    localparam int unsigned REG_START = 32'h00010 ; // 
+    localparam int unsigned ON_OFF_REG = 32'h000 + REG_START ;// // 0 iddle, 1 inference (continuous)
+    localparam int unsigned PROG       = 32'h008 + REG_START ; 
+    localparam int unsigned READ       = 32'h00C + REG_START ;
+    localparam int unsigned INFERENCE  = 32'h010 + REG_START ;// // choix stoch/log/power conscious
+    localparam int unsigned LAUNCH_INF = 32'h014 + REG_START ;//
+    localparam int unsigned RECUP_RES  = 32'h018 + REG_START ;// // stoch
+    localparam int unsigned RECUP_RES_2= 32'h01C + REG_START ;// // power conscious
+    localparam int unsigned RECUP_RES_3= 32'h020 + REG_START ;// // log
+    localparam int unsigned OBS_COL    = 32'h024 + REG_START ;// // observations pour l'inference
+    localparam int unsigned OBS_ROW    = 32'h028 + REG_START ;// // observations pour l'inference
+    localparam int unsigned WRITING_SET_RESET = 32'h02C + REG_START ;//
 
-    localparam int unsigned MEM_ARRAY_START = 32'h800 ; // word size of this is 32 bits
-    localparam int unsigned MEM_ARRAY_END = 32'hFFF ;
+
+    localparam int unsigned MEM_ARRAY_START = 32'h00100 ; // word size of this is 32 bits
+    localparam int unsigned MEM_ARRAY_END = 32'h200FF ;
 
     logic [MatrixSize-1:0] new_obs ;
     logic [DataWidth-1:0] device_read_data;
@@ -102,9 +103,12 @@ module fraise_top  #(
     /* verilator lint_off UNOPTFLAT */
     ON_OFF_reg_e ON_OFF_reg ; 
 
-    logic [DataWidth-1:0] obs_reg ;
-    logic [MatrixSize-1:0][2:0]Observation_vec ;
-    assign Observation_vec = {obs_reg[26:24], obs_reg[18:16], obs_reg[10:8], obs_reg[2:0]} ; 
+    logic [DataWidth-1:0] obs_reg_col ;
+    logic [DataWidth-1:0] obs_reg_row ;
+    logic [MatrixSize-1:0][5:0]Observation_vec_row ;
+    logic [MatrixSize-1:0][2:0]Observation_vec_col ;
+    assign Observation_vec_col = {obs_reg_col[26:24], obs_reg_col[18:16], obs_reg_col[10:8], obs_reg_col[2:0]} ; 
+    assign Observation_vec_row = {obs_reg_row[29:24], obs_reg_row[21:16], obs_reg_row[13:8], obs_reg_row[5:0]} ; 
     logic launch_reg ; 
     logic res_valid, irq_en ; 
     logic stay_high ;
@@ -132,67 +136,6 @@ module fraise_top  #(
     // irq management
     localparam int unsigned res_size = 2**Nword_used;
 
-    logic [MatrixSize-1:0] decision_result ; 
-    logic comparator_bypass ; 
-
-    logic [MatrixSize-1:0] comp_res ; 
-    logic [MatrixSize-1:0][res_size-1:0] comp_precision ; // only usefull for == test 
-    logic [MatrixSize-1:0][res_size-1:0] comp_reference ; 
-    logic [MatrixSize-1:0][res_size-1:0] comp_instr; 
-
-    genvar i ;
-    generate
-        for (i = 0; i< MatrixSize ; i = i+1) begin
-            comparator #(.DataWidth(2**Nword_used)) u_comp (
-                .instruction(comparator_intr_e'(comp_instr[i])) ,
-                .op_a(results[i]),
-                .op_b(comp_reference[i]),
-                .op_precision(comp_precision[i]),
-                .result(comp_res[i])
-            ) ; 
-        end
-    endgenerate
-
-    logic [MatrixSize-1:0] min_max_res ; 
-
-    always_comb begin
-        if(res_valid) begin
-            /* verilator lint_off CASEINCOMPLETE */
-            case(comp_instr[0])
-            min: begin
-                min_max_res[0] = (results[0] < results[1] & results[0] < results[2] & results[0] < results[3]) ? 1'b1 : 1'b0 ;
-                min_max_res[1] = (results[1] < results[0] & results[1] < results[2] & results[1] < results[3]) ? 1'b1 : 1'b0 ;
-                min_max_res[2] = (results[2] < results[0] & results[2] < results[1] & results[2] < results[3]) ? 1'b1 : 1'b0 ;
-                min_max_res[3] = (results[3] < results[0] & results[3] < results[1] & results[3] < results[2]) ? 1'b1 : 1'b0 ; 
-            end
-            max: begin
-                min_max_res[0] = (results[0] > results[1] & results[0] > results[2] & results[0] > results[3]) ? 1'b1 : 1'b0 ;
-                min_max_res[1] = (results[1] > results[0] & results[1] > results[2] & results[1] > results[3]) ? 1'b1 : 1'b0 ;
-                min_max_res[2] = (results[2] > results[0] & results[2] > results[1] & results[2] > results[3]) ? 1'b1 : 1'b0 ;
-                min_max_res[3] = (results[3] > results[0] & results[3] > results[1] & results[3] > results[2]) ? 1'b1 : 1'b0 ;
-            end
-            endcase
-        end 
-    end
-
-    always_ff @(posedge(clk_i)) begin
-        if(res_valid) begin
-            if(comp_instr[0] == min | comp_instr[0] == max) begin
-                decision_result <= min_max_res ;
-            end else begin
-                decision_result <= comp_res ;
-            end
-            if(irq_en) begin
-                if (comparator_bypass) begin
-                    irq_o <= 1'b1 ;
-                end else begin
-                    irq_o <= (decision_result != 0) ? 1'b1 : 1'b0 ;
-                end
-            end
-        end else begin
-            irq_o <= 1'b0 ;
-        end
-    end 
 
     typedef enum int { 
             Host_idle,
@@ -207,6 +150,18 @@ module fraise_top  #(
     logic [MatrixSize-1:0][AddrWidth-1:0] Obs_address ; // TODO: 
 
     // controle machine
+    logic [7:0] adr_col_lfsr [3:0];
+    logic [7:0] seeds_input [3:0];
+    initial begin
+        adr_col_lfsr[0] = 8'b00000000;
+        adr_col_lfsr[1] = 8'b01000000;
+        adr_col_lfsr[2] = 8'b10000000;
+        adr_col_lfsr[3] = 8'b11000000;
+        seeds_input[0] = 8'b11101011;
+        seeds_input[1] = 8'b11111011;
+        seeds_input[2] = 8'b01111111;
+        seeds_input[3] = 8'b01011100;
+    end
 
     typedef enum int { 
         Inference, 
@@ -219,6 +174,7 @@ module fraise_top  #(
 
     typedef enum int { // TODO: clean up this SM
         Idle,
+        Run_load_seeds,
         Read_cycles_stoch,
         Run_stoch, 
         Read_cycles_log,
@@ -244,8 +200,18 @@ module fraise_top  #(
     logic [AddrWidth-1:0] read_addr ;
     logic read_is_done ; 
 
-    logic [2:0] count_reads ; 
+    logic [6:0] count_reads ; 
     logic [31:0] result_read ;
+    logic [7:0] count_stoch;
+    logic [255:0] results_stoch_1;
+    logic [255:0] results_stoch_2;
+    logic [255:0] results_stoch_3;
+    logic [255:0] results_stoch_4;
+    logic [31:0] results_stoch_sum;
+    logic [31:0] results_stoch_first;
+    logic type_inf;
+    find_first_one_stoch ffone_0(clk_i, results_stoch_1, results_stoch_2, results_stoch_3, results_stoch_4, results_stoch_first, results_stoch_sum);
+    
 
     always_ff @( posedge(clk_i) ) begin : Inference_machine
         if(reset_n) begin
@@ -259,104 +225,72 @@ module fraise_top  #(
                     end
                     device_read_data = ON_OFF_reg;
                 end
-                OBS_REG_1: begin 
-                    if(req_wen_i) begin
-                        obs_reg <= req_wdata_i & req_ben_32 ;
+                PROG: begin
+                    if (req_wen_i) begin
+                        inference_write <= Writting ;
                     end
-                    device_read_data = obs_reg ;
+                    device_read_data = inference_write ;
                 end
-                LAUNCH_REG: begin 
+                READ: begin
+                    if(req_wen_i) begin
+                        obs_reg_col <= req_wdata_i & req_ben_32 ;
+                    end
+                    device_read_data = obs_reg_col ;
+                end
+                INFERENCE: begin 
+                    if(req_wen_i) begin
+                        type_inf <= req_wdata_i[0] ;
+                        inference_write <= Inference;
+                    end
+                end
+                LAUNCH_INF: begin
                     if(req_wen_i) begin
                         launch_reg <= req_wdata_i[0] ;
                     end
                     device_read_data = {31'b0, launch_reg} ;
-                end 
-                RES_VALID_REG: begin 
-                    device_read_data = {31'b0, res_valid} ;
                 end
-                RES_REG: begin 
+                RECUP_RES: begin
+                    device_read_data = results_stoch_sum ;
+                    res_valid <= '0 ;
+                    launch_reg <= '0;
+                end
+                RECUP_RES_2: begin
+                    device_read_data = results_stoch_first ;
+                    res_valid <= '0 ;
+                    launch_reg <= '0;
+                end
+                RECUP_RES_3: begin
                     device_read_data = results ;
                     res_valid <= '0 ;
+                    launch_reg <= '0;
                 end
-                IRQ_EN_REG: begin 
+                OBS_COL: begin 
                     if(req_wen_i) begin
-                        irq_en <= req_wdata_i[0] ;
+                        obs_reg_col <= req_wdata_i & req_ben_32 ;
                     end
-                    device_read_data = {31'b0, irq_en} ;
+                    device_read_data = obs_reg_col ;
                 end
-                PRECISION_REG: begin
+                OBS_ROW: begin 
                     if(req_wen_i) begin
-                        comp_precision <= req_wdata_i ;
-                    end 
-                    device_read_data = comp_precision ;
-                end
-                COMP_INSTRUCTION_REG: begin
-                    if(req_wen_i) begin
-                        comp_instr <= req_wdata_i ;
-                    end 
-                    device_read_data = comp_instr ;
-                end
-                COMP_REFERENCE: begin
-                    if(req_wen_i) begin
-                        comp_reference <= req_wdata_i ;
-                    end 
-                    device_read_data = comp_reference ;
-                end
-                COMP_RESULT: begin
-                    device_read_data = {28'b0, comp_res} ;
-                end
-                COMP_BYPASS: begin
-                    if(req_wen_i) begin
-                        comparator_bypass <= req_wdata_i[0] ;
-                    end 
-                    device_read_data = {31'b0, comparator_bypass} ;
-                end
-                INFERENCE_WRITE_REG: begin
-                    if(req_wen_i) begin
-                        inference_write <= inference_write_e'(req_wdata_i[1:0]) ;
-                    end 
-                    device_read_data = inference_write ;
+                        obs_reg_row <= req_wdata_i & req_ben_32 ;
+                    end
+                    device_read_data = obs_reg_row ;
                 end
                 WRITING_SET_RESET: begin
                     if(req_wen_i)begin
                         set_reset <= req_wdata_i[0] ;
                     end
                 end
-                HOST_EN:begin
-                    if(req_wen_i)begin
-                        Host_en <= req_wdata_i[0] ;
-                    end
-                end
-                OBS_ADDR_1:begin
-                    if(req_wen_i)begin
-                        Obs_address[0] <= req_wdata_i ;
-                    end
-                end
-                OBS_ADDR_2:begin
-                    if(req_wen_i)begin
-                        Obs_address[1] <= req_wdata_i ;
-                    end
-                end
-                OBS_ADDR_3:begin
-                    if(req_wen_i)begin
-                        Obs_address[2] <= req_wdata_i ;
-                    end
-                end
-                OBS_ADDR_4:begin
-                    if(req_wen_i)begin
-                        Obs_address[3] <= req_wdata_i ;
-                    end
-                end
                 default: begin
                     if(req_addr_i >= MEM_ARRAY_START & req_addr_i <= MEM_ARRAY_END) begin
                         if(req_wen_i) begin
                             data_to_write <= req_wdata_i ;
-                            write_addr <= req_addr_i >> 2 ;
+                            write_addr <= (req_addr_i -  MEM_ARRAY_START)>>2;
                             write_en <= 'b1 ;
                         end else begin
                             wait_read = '1 ;
                             read_host_addr <= req_host_addr_i; 
-                            read_addr <= req_addr_i >> 2 ;
+                            read_addr <= (req_addr_i -  MEM_ARRAY_START)>> 2 ;
                             old_inference_write = inference_write ; 
                             inference_write <= Reading ; 
                             count_reads = 0 ;
@@ -394,14 +328,26 @@ module fraise_top  #(
                     counter_run_reset <= '0 ;
                     inference_state <= Read_cycles_log ;
                     results <= '0 ;
-                    
+                    inference <= '0; // Activation de l'inférence
+                    load_seed <= '0; // Chargement des seeds
+                    read_1 <= '0; // Lecture de 1 bit
+                    read_8 <= '0; // Lecture de 8 bits
+                    load_mem <= '0; // Programmation de la mémoire
+                    read_out <= '0; // Envoi de la sortie de lecture ou d'inférence
+                    stoch_log <= '0; // Mode de calcul stochastique ou logarithmique
+                    seeds <= '0; // Seeds pour le calcul stochastique
+                    ready_o <= '1 ;
                 end
                 Read_cycles_log: begin
                     ready_o <= '0 ;
                     launch_reg <= '0 ; 
-                    instructions <= 2'b10 ; // read_mem_mode
-                    addr_col = {read_addr[4:3], read_addr[0] , count_reads[1:0] } ; 
-                    addr_row = {read_addr[2:1], 3'b0} ;
+                    read_8 <= '1;
+                    stoch_log <= '1;
+                    read_out <= '0;
+                    //addr_col = {read_addr[4:3], read_addr[0] , count_reads[1:0] } ; 
+                    //addr_row = {read_addr[2:1], 3'b0} ;
+                    addr_col = {read_addr[2:1], 3'b0, read_addr[0], count_reads[1:0]}; // 2bits of likelihoods adress and 1 bit for the 32 half of the array and 5 for the 32 bits
+                    addr_row = {read_addr[10:3]}; // 8 bits of adress : 2 for likelihoods and 6 for memory
                     case (read_state)
                         SL_WL_rise : begin
                             WL_signal <= '1 ;
@@ -425,18 +371,21 @@ module fraise_top  #(
                     endcase
                 end
                 Read_out:begin
-                    instructions <= 2'b01 ;
+                    read_8 <= '0;
+                    read_out <= '1;
+                    inference <= '1;
                     if(counter_run >= 3) begin
                         inference_state <= Run_log ;
                     end
                 end
                 Run_log: begin
-                    instructions <= 2'b01 ;
-                    case(read_addr[2:1]) 
-                        2'b00 : result_read[count_reads*8 +: 8] <= result_read[count_reads*8 +: 8] | ({7'b0, bit_out[0]} << (7-(counter_run-5))) ;
-                        2'b01 : result_read[count_reads*8 +: 8] <= result_read[count_reads*8 +: 8] | ({7'b0, bit_out[1]} << (7-(counter_run-5))) ;
-                        2'b10 : result_read[count_reads*8 +: 8] <= result_read[count_reads*8 +: 8] | ({7'b0, bit_out[2]} << (7-(counter_run-5))) ;
-                        2'b11 : result_read[count_reads*8 +: 8] <= result_read[count_reads*8 +: 8] | ({7'b0, bit_out[3]} << (7-(counter_run-5))) ;
+                    read_out <= '1;
+                    inference <= '1;
+                    case(read_addr[10:9]) 
+                        2'b00 : result_read[count_reads*8 +: 8] <= result_read[count_reads*8 +: 8] | ({7'b0, bit_out[0]} << (7-(counter_run-4))) ;
+                        2'b01 : result_read[count_reads*8 +: 8] <= result_read[count_reads*8 +: 8] | ({7'b0, bit_out[1]} << (7-(counter_run-4))) ;
+                        2'b10 : result_read[count_reads*8 +: 8] <= result_read[count_reads*8 +: 8] | ({7'b0, bit_out[2]} << (7-(counter_run-4))) ;
+                        2'b11 : result_read[count_reads*8 +: 8] <= result_read[count_reads*8 +: 8] | ({7'b0, bit_out[3]} << (7-(counter_run-4))) ;
                     endcase
                     if(counter_run >= 13) begin
                         counter_run_en <= '0 ;
@@ -459,20 +408,73 @@ module fraise_top  #(
             case(inference_state)
                 Idle: begin
                     read_state <= SL_WL_rise ;
-                    instructions <= 2'b00 ; 
+                    inference <= '0; // Activation de l'inférence
+                    load_seed <= '0; // Chargement des seeds
+                    read_1 <= '0; // Lecture de 1 bit
+                    read_8 <= '0; // Lecture de 8 bits
+                    load_mem <= '0; // Programmation de la mémoire
+                    read_out <= '0; // Envoi de la sortie de lecture ou d'inférence
+                    stoch_log <= '0; // Mode de calcul stochastique ou logarithmique
+                    seeds <= '0; // Seeds pour le calcul stochastique
                     counter <= '0 ;
                     counter_run_reset <= '0 ;
-                    if(ON_OFF_reg == On | launch_reg == '1) begin
-                        inference_state <= Read_cycles_log ;
-                        results <= '0 ;
-                    end 
+                    if(ON_OFF_reg == On & launch_reg == '1) begin
+                        
+                        // add a if to use either stoch or log inference
+                        if (type_inf == '0) begin
+                            inference_state <= Run_load_seeds;
+                            results_stoch_first <= '0;
+                            results_stoch_sum <= '0;
+                            stoch_log <= '0;
+                        end
+                        else begin
+                            inference_state <= Read_cycles_log;
+                            results <= '0;
+                            stoch_log <= '1;
+                        end
+                    end
                 end
-                Read_cycles_log: begin
+                Run_load_seeds: begin
+                    load_seed <= '1;
+                    CBLEN <= 1'b0;
+					WL_signal <= 1'b0;
+					SL_signal <= 1'b0;
+					CBL <= 1'b0;
+					//addr_row <= '0;
+                    counter <= counter + 1;
+                    if (counter == 0) begin
+						addr_col = adr_col_lfsr[0];
+						seeds <= seeds_input[0];
+					end
+					if (counter == 1) begin
+						addr_col = adr_col_lfsr[1];
+						seeds <= seeds_input[1];
+					end
+					if (counter == 2) begin
+						addr_col = adr_col_lfsr[2];
+						seeds <= seeds_input[2];
+					end
+					if (counter == 3) begin
+						addr_col = adr_col_lfsr[3];
+						seeds <= seeds_input[3];
+						//counter <= '0;
+						
+					end
+					if (counter == 4) begin
+						counter <= '0;
+						load_seed <= '0; // fin du load des seeds
+                        inference_state <= Read_cycles_stoch;
+					end
+
+                end
+                Read_cycles_stoch: begin
+                    read_1 <= '1;
+                    load_seed <= '0;
+                    inference <= '0;
                     ready_o <= '0 ;
-                    launch_reg <= '0 ; 
-                    instructions <= 2'b00 ; // read_mem_mode
-                    addr_col = {counter[1:0], Observation_vec[counter[1:0]]} ; 
-                    addr_row = {2'b0, 3'b0 } ;
+                    launch_reg <= '0 ;
+                    addr_col = {counter[1:0], 3'b0, Observation_vec_col[counter[1:0]]} ; 
+                    addr_row = {2'b0, Observation_vec_row[counter[1:0]]} ;
                     case (read_state)
                         SL_WL_rise : begin
                             WL_signal <= '1 ;
@@ -491,25 +493,85 @@ module fraise_top  #(
                             WL_signal <= '0 ;
                             read_state <= SL_WL_rise ;
                             if(counter == 8'(MatrixSize-1)) begin
-                                inference_state <= Read_out ;
-                                counter_run_en <= '1 ;
+                                inference_state <= Run_stoch ;
+                                //counter_run_en <= '1 ;
+                                counter <= '0;
                             end 
                             counter <= counter + 1 ;
                         end
                     endcase
                 end
+                Run_stoch: begin
+                    read_1 <= 0;
+                    inference <= 1;
+                    count_stoch <= count_stoch + 1;
+                    results_stoch_1[count_stoch] <= bit_out[0];
+                    results_stoch_2[count_stoch] <= bit_out[1];
+                    results_stoch_3[count_stoch] <= bit_out[2];
+                    results_stoch_4[count_stoch] <= bit_out[3];
+                    if (count_stoch == 255) begin
+                        count_stoch <= '0;
+                        inference <= '0;
+                        inference_state <= Idle;
+                        ON_OFF_reg <= Off;
+                        ready_o <= '1 ;
+                    end
+                end
+                Read_cycles_log: begin
+                    ready_o <= '0 ;
+                    launch_reg <= '0 ; 
+                    read_8 <= '1; // Lecture de 8 bits
+                    addr_col = {counter[1:0], 3'b0, Observation_vec_col[counter[1:0]]} ; 
+                    addr_row = {2'b0, Observation_vec_row[counter[1:0]]} ;
+                    case (read_state)
+                        SL_WL_rise : begin
+                            WL_signal <= '1 ;
+                            SL_signal <= '1 ;
+                            read_state <= Sl_fall ;
+                        end 
+                        Sl_fall : begin
+                            SL_signal <= '0 ;
+                            read_state <= WL_high ;
+                        end
+                        WL_high : begin
+                            WL_signal <= '1 ;
+                            read_state <= WLfall ;
+                        end
+                        WLfall : begin
+                            WL_signal <= '0 ;
+                            read_state <= SL_WL_rise ;
+                            if(counter == 8'(MatrixSize-1)) begin
+                                inference_state <= Inf_cycles ;
+                                //counter_run_en <= '1 ;
+                                counter <= '0;
+                            end
+                            else begin 
+                                counter <= counter + 1 ;
+                            end
+                        end
+                    endcase
+                end
+                Inf_cycles:begin
+                    read_8 <= '0;
+                    inference <= '1;
+                    if(counter == 3) begin
+                        inference_state <= Read_out ;
+                        counter_run_en <= '1 ;
+                    end 
+                    counter <= counter + 1 ;
+                end
                 Read_out:begin
-                    instructions <= 2'b01 ;
+                    read_out <= '1;
                     if(counter_run >= 3) begin
                         inference_state <= Run_log ;
                     end
                 end
                 Run_log: begin
-                    instructions <= 2'b01 ;
-                    results[0] <= results[0] | ({7'b0, bit_out[0]} << (7-(counter_run-5))) ;
-                    results[1] <= results[1] | ({7'b0, bit_out[1]} << (7-(counter_run-5))) ;
-                    results[2] <= results[2] | ({7'b0, bit_out[2]} << (7-(counter_run-5))) ;
-                    results[3] <= results[3] | ({7'b0, bit_out[3]} << (7-(counter_run-5))) ;
+                    read_out <= '1;
+                    results[0] <= results[0] | ({7'b0, bit_out[0]} << (7-(counter_run-4))) ;
+                    results[1] <= results[1] | ({7'b0, bit_out[1]} << (7-(counter_run-4))) ;
+                    results[2] <= results[2] | ({7'b0, bit_out[2]} << (7-(counter_run-4))) ;
+                    results[3] <= results[3] | ({7'b0, bit_out[3]} << (7-(counter_run-4))) ;
 
                     if(counter_run >= 12) begin
                         counter_run_en <= '0 ;
@@ -521,15 +583,18 @@ module fraise_top  #(
                     res_valid <= '1 ; 
                     ready_o <= '1 ;
                     inference_state <= Idle;
+                    ON_OFF_reg <= Off;
                 end
             endcase
             end
             Writting:begin
                 if(write_en) begin
                 CBLEN <= '1 ;
-                instructions <= 2'b11 ; // write mode
-                addr_col = {write_addr[4:3], write_addr[0], write_counter[4:3]} ;
-                addr_row = {write_addr[2:1], write_counter[2:0]} ;
+                load_mem <= '1; // write mode
+                //addr_col = {write_addr[4:3], write_addr[0], write_counter[4:3]} ;
+                //addr_row = {write_addr[2:1], write_counter[2:0]} ;
+                addr_col = {write_addr[2:1], write_addr[0], write_counter[4:0]}; // [2:1] 2bits of likelihoods adress and [0] 1 bit for the 32 half of the array
+                addr_row = {write_addr[10:3]}; // 8 bits of adress : [10:9] 2 for likelihoods and [8:3] 6 for memory
                 if(write_state == set_CSL) begin
                     internal_write_counter <= '0 ;
                 end else begin
@@ -577,49 +642,6 @@ module fraise_top  #(
             end
         endcase
         // Host side control 
-        
-        case (Host_state)
-            Host_idle: begin
-                Host_req_valid_o <= '0 ;
-                Host_resp_ready_o <= '0 ;
-                if(Host_en & (new_obs != '0)) begin
-                    Host_state <= Host_send_request ;
-                end
-             end
-            Host_send_request: begin
-                if(Host_req_ready_i) begin
-                    case ({4'b0, new_obs})
-                        1: obs_index = 0 ;
-                        2: obs_index = 1 ;
-                        4: obs_index = 2 ;
-                        8: obs_index = 3 ;
-                        default: obs_index = 0 ;
-                    endcase  
-                    Host_req_valid_o <= '1 ;
-                    Host_tgt_addr_o <= Obs_address[obs_index] ;
-                    Host_wen_o <= '0 ;
-                    Host_ben_o <= 4'b1111;
-                    Host_wdata_o <= '0 ;
-                    if(Host_gnt_i == '1) begin
-                        Host_state <= Host_get_response ;
-                    end
-                end                   
-            end
-            Host_get_response: begin
-                Host_req_valid_o <= '0 ;
-                   Host_tgt_addr_o <= '0 ;
-                Host_resp_ready_o <= '1 ;
-                if(Host_resp_valid_i == '1) begin
-                    case (obs_index)
-                        1 : obs_reg[2:0] <= Host_resp_data_i[2:0] ;
-                        2 : obs_reg[5:3] <= Host_resp_data_i[2:0] ;
-                        3 : obs_reg[8:6] <= Host_resp_data_i[2:0] ;
-                        4 : obs_reg[11:9] <= Host_resp_data_i[2:0] ;
-                    endcase
-                    Host_state <= Host_idle ;
-                end
-            end
-            endcase 
         end else begin
             inference_state <= Idle;
             read_state <= SL_WL_rise ; 
@@ -694,32 +716,48 @@ module fraise_top  #(
     assign CWL = WL_signal ;
     assign CSL = SL_signal ;
     logic WL_signal, SL_signal ;
-    logic [1:0] instructions ; 
-    logic  bit_out_1 [MatrixSize-1:0];
+    logic  inference; // Activation de l'inférence
+    logic  load_seed; // Chargement des seeds
+    logic  read_1; // Lecture de 1 bit
+    logic  read_8; // Lecture de 8 bits
+    logic  load_mem; // Programmation de la mémoire
+    logic  read_out; // Envoi de la sortie de lecture ou d'inférence 
+    logic  stoch_log; // Mode de calcul stochastique ou logarithmique
+    logic  [7:0] seeds; // Seeds pour le calcul stochastique
+    //logic  bit_out_1 [MatrixSize-1:0];
     logic [MatrixSize-1:0] bit_out ;
-    assign bit_out = {bit_out_1[3], bit_out_1[2], bit_out_1[1], bit_out_1[0]} ;
+    //assign bit_out = {bit_out_1[3], bit_out_1[2], bit_out_1[1], bit_out_1[0]} ;
+    /*
     `ifdef VERILATOR
     Bayesian_log2 #(
         .Narray(MatrixSizeLog2),
-        .Nword(ArraySizeLog2)
+        .Nword(ArraySizeLog2),
+        .Nword_used(Nword_used)
     ) e_Bayesian_log (
         .clk(clk_i),
-        .CBL0(CBL),
-        .CBLEN0(CBLEN), // 1 when pcsa connected 0 when not
-        .CSL0(SL_signal), // 1 when CWlen IS ENABLED 
-        .CWL0(WL_signal), 
-        .instructions_in(instructions), 
+        .CBL(CBL),
+        .CBLEN(CBLEN), // 1 when pcsa connected 0 when not
+        .CSL(SL_signal), // 1 when CWlen IS ENABLED 
+        .CWL(WL_signal),
+        .inference(inference), 
+        .load_seed(load_seed),
+        .read_1(read_1),
+        .read_8(read_8),
+        .load_mem(load_mem),
+        .read_out(read_out),
         
         .adr_full_col_in(addr_col),
         .adr_full_row_in(addr_row),
-        .DATA_out(bit_out_1)
+        .stoch_log(stoch_log),
+        .seeds(seeds),
+        .bit_out(bit_out_1)
 
     ) ;
     `endif
     `ifndef VERILATOR
     assign bit_out_1 = bit_out_top ;
     `endif
-
+    */
     // interface with Bayesian_stoch_log TODO: add a proper interface 
         /*
     logic [ArraySizeLog2 + MatrixSizeLog2 -1 :0] addr_col ;
@@ -730,7 +768,7 @@ module fraise_top  #(
     logic [MatrixSize-1:0] bit_out ;
     logic CBL, CBLEN ; 
     logic WL_signal, SL_signal, precharge_en ;
-
+    */
     `ifdef VERILATOR // not on chip 
         Bayesian_stoch_log #(
             .Narray(MatrixSizeLog2),
@@ -753,10 +791,10 @@ module fraise_top  #(
             .adr_full_col(addr_col),
             .adr_full_row(addr_row),
             .stoch_log(stoch_log), 
-            .seeds(seed_input),
+            .seeds(seeds),
             .bit_out(bit_out)
         ) ; 
     `endif 
-    */
+    
 
 endmodule
