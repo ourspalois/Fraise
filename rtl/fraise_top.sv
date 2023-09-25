@@ -210,8 +210,6 @@ module fraise_top  #(
     logic [31:0] results_stoch_sum;
     logic [31:0] results_stoch_first;
     logic type_inf;
-    find_first_one_stoch ffone_0(clk_i, results_stoch_1, results_stoch_2, results_stoch_3, results_stoch_4, results_stoch_first, results_stoch_sum);
-    
 
     always_ff @( posedge(clk_i) ) begin : Inference_machine
         if(reset_n) begin
@@ -711,65 +709,26 @@ module fraise_top  #(
 
     logic [ArraySizeLog2 + MatrixSizeLog2 -1 :0] addr_col ;
     logic [ArraySizeLog2 + MatrixSizeLog2 -1 :0] addr_row ; 
-    logic CBL, CBLEN ; 
-    logic CWL, CSL ; 
-    assign CWL = WL_signal ;
-    assign CSL = SL_signal ;
-    logic WL_signal, SL_signal ;
-    logic  inference; // Activation de l'inférence
-    logic  load_seed; // Chargement des seeds
-    logic  read_1; // Lecture de 1 bit
-    logic  read_8; // Lecture de 8 bits
-    logic  load_mem; // Programmation de la mémoire
-    logic  read_out; // Envoi de la sortie de lecture ou d'inférence 
-    logic  stoch_log; // Mode de calcul stochastique ou logarithmique
-    logic  [7:0] seeds; // Seeds pour le calcul stochastique
-    //logic  bit_out_1 [MatrixSize-1:0];
-    logic [MatrixSize-1:0] bit_out ;
-    //assign bit_out = {bit_out_1[3], bit_out_1[2], bit_out_1[1], bit_out_1[0]} ;
-    /*
-    `ifdef VERILATOR
-    Bayesian_log2 #(
-        .Narray(MatrixSizeLog2),
-        .Nword(ArraySizeLog2),
-        .Nword_used(Nword_used)
-    ) e_Bayesian_log (
-        .clk(clk_i),
-        .CBL(CBL),
-        .CBLEN(CBLEN), // 1 when pcsa connected 0 when not
-        .CSL(SL_signal), // 1 when CWlen IS ENABLED 
-        .CWL(WL_signal),
-        .inference(inference), 
-        .load_seed(load_seed),
-        .read_1(read_1),
-        .read_8(read_8),
-        .load_mem(load_mem),
-        .read_out(read_out),
-        
-        .adr_full_col_in(addr_col),
-        .adr_full_row_in(addr_row),
-        .stoch_log(stoch_log),
-        .seeds(seeds),
-        .bit_out(bit_out_1)
-
-    ) ;
-    `endif
     `ifndef VERILATOR
-    assign bit_out_1 = bit_out_top ;
+        logic WL_signal, SL_signal ;
+        assign WL_signal = CWL ;
+        assign SL_signal = CSL ;
     `endif
-    */
-    // interface with Bayesian_stoch_log TODO: add a proper interface 
-        /*
-    logic [ArraySizeLog2 + MatrixSizeLog2 -1 :0] addr_col ;
-    logic [ArraySizeLog2 + MatrixSizeLog2 -1 :0] addr_row ; 
-    logic stoch_log, inference, load_seed, read_1, read_8, load_mem, read_out ;
-    logic [DataWidth-1:0] seeds ; 
-    logic [2**Nword_used -1 :0] seed_input ;
-    logic [MatrixSize-1:0] bit_out ;
-    logic CBL, CBLEN ; 
-    logic WL_signal, SL_signal, precharge_en ;
-    */
     `ifdef VERILATOR // not on chip 
+
+        logic CBL, CBLEN ; 
+        logic CWL, CSL ; 
+        logic  inference; // Activation de l'inférence
+        logic  load_seed; // Chargement des seeds
+        logic  read_1; // Lecture de 1 bit
+        logic  read_8; // Lecture de 8 bits
+        logic  load_mem; // Programmation de la mémoire
+        logic  read_out; // Envoi de la sortie de lecture ou d'inférence 
+        logic  stoch_log; // Mode de calcul stochastique ou logarithmique
+        logic  [7:0] seeds; // Seeds pour le calcul stochastique
+        //logic  bit_out_1 [MatrixSize-1:0];
+        logic [MatrixSize-1:0] bit_out ;
+    
         Bayesian_stoch_log #(
             .Narray(MatrixSizeLog2),
             .Nword(ArraySizeLog2),
@@ -795,6 +754,4 @@ module fraise_top  #(
             .bit_out(bit_out)
         ) ; 
     `endif 
-    
-
 endmodule

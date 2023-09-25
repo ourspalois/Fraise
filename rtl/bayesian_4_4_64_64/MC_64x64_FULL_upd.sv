@@ -10,9 +10,8 @@ module MC_64x64_FULL_upd (
 
     output logic [63:0] DOUT
 );
-    
+    logic [63:0] [63:0] line_out ;
     logic [63:0] CWL ;
-    logic [63:0] DOUT0;
     genvar h ; 
     generate
         for(h = 0 ; h < 32 ; h = h+1) begin
@@ -30,11 +29,13 @@ module MC_64x64_FULL_upd (
                 .CSL(CSL),
                 .DIN(DIN),
                 .DINb(DINb),
-                .dout(DOUT0)
+                .dout(line_out[j])
             );
         end
     endgenerate 
-    assign DOUT = 64'h0000000000000001;
+
+    assign DOUT = line_out[0] | line_out[1] | line_out[2] | line_out[3] | line_out[4] | line_out[5] | line_out[6] | line_out[7] | line_out[8] | line_out[9] | line_out[10] | line_out[11] | line_out[12] | line_out[13] | line_out[14] | line_out[15] | line_out[16] | line_out[17] | line_out[18] | line_out[19] | line_out[20] | line_out[21] | line_out[22] | line_out[23] | line_out[24] | line_out[25] | line_out[26] | line_out[27] | line_out[28] | line_out[29] | line_out[30] | line_out[31] | line_out[32] | line_out[33] | line_out[34] | line_out[35] | line_out[36] | line_out[37] | line_out[38] | line_out[39] | line_out[40] | line_out[41] | line_out[42] | line_out[43] | line_out[44] | line_out[45] | line_out[46] | line_out[47] | line_out[48] | line_out[49] | line_out[50] | line_out[51] | line_out[52] | line_out[53] | line_out[54] | line_out[55] | line_out[56] | line_out[57] | line_out[58] | line_out[59] | line_out[60] | line_out[61] | line_out[62] | line_out[63];
+
     
 endmodule
 
@@ -78,6 +79,9 @@ module cell_matrix (
     logic [1:0] command;
     assign command = {CBL, CSL};
     always_latch begin
+        if(CWL == 1'b0 && CSL ==1'b1) begin
+            dout = 'b0 ; 
+        end
         if (CWL) begin
             if(CBLEN) begin
                 case (command)
