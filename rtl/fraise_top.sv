@@ -46,8 +46,8 @@ module fraise_top  #(
     `ifndef VERILATOR
     , output logic CBL, 
     output logic CBLEN,
-    output logic CSL,
-    output logic CWL,
+    output logic SL_signal,
+    output logic WL_signal,
     output logic  inference, // Activation de l'inférence
     output logic  load_seed, // Chargement des seeds
     output logic  read_1, // Lecture de 1 bit
@@ -322,6 +322,8 @@ module fraise_top  #(
             Reading: begin
             case(inference_state)
                 Idle: begin
+                    CBLEN <= '0 ;
+                    CBL <= '0 ; 
                     read_state <= SL_WL_rise ;
                     counter_run_reset <= '0 ;
                     inference_state <= Read_cycles_log ;
@@ -391,6 +393,7 @@ module fraise_top  #(
                     end
                 end
                 Done: begin
+                    read_out <= '0 ; 
                     count_reads = count_reads + 1 ;
                     if(count_reads >= 4) begin
                         inference_write <= old_inference_write ; 
@@ -711,8 +714,6 @@ module fraise_top  #(
     logic [ArraySizeLog2 + MatrixSizeLog2 -1 :0] addr_row ; 
     `ifndef VERILATOR
         logic WL_signal, SL_signal ;
-        assign WL_signal = CWL ;
-        assign SL_signal = CSL ;
     `endif
     `ifdef VERILATOR // not on chip 
 
