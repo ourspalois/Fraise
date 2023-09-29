@@ -716,7 +716,7 @@ module fraise_top  #(
         logic WL_signal, SL_signal ;
     `endif
     `ifdef VERILATOR // not on chip 
-
+        logic WL_signal, SL_signal ;
         logic CBL, CBLEN ; 
         logic CWL, CSL ; 
         logic  inference; // Activation de l'inférence
