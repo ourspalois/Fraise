@@ -1,17 +1,12 @@
 # 🍓 Fraise 🍓
-the control hardware for the bayesian machine accelerator to be integrated in Pinaipple
+the control hardware for the bayesian machine accelerator to be integrated in Adam
 
 ## Goal of this repo
-This repo is a module to encapsulate the bayesian accelerator developped by the INTEGNANO team at C2N. 
+This repo is a module to encapsulate the bayesian accelerator developped by the INTEGNANO team at C2N into a SOC called ADAM. 
 
 ## structure of the repo : 
 * rtl/ : 
-    + low_interface/ a folder with the first layer of interaction with the Memristor array.
-    + fraise_top.sv the top rtl file for fraise.  
-* fraise.core : a fusesoc description file. 
+    + rtl_chip : contains the RTL of the chip and a bhv module for the RRAM. 
+    + control_interface
+    + Power_DMA 
 
-## list all cores in the repo :
-
-```bash
-fusesoc --cores-root=. --log-file fusesoc.log list-cores 
-```
