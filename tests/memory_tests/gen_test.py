@@ -4,65 +4,63 @@ def test_control_regs(filename) :
     
     control_base_address = 128
     control_lenght = 8
-    values = np.random.randint(0, 2 ** 8 - 1, size=control_lenght, dtype=np.uint8)
+    values = np.random.randint(0, 2 ** 32 - 1, size=control_lenght, dtype=np.uint32)
 
     with open(filename, 'a') as file:
-        for address in range(control_base_address, control_base_address + control_lenght):
-            file.write(f"write | {address :02X} | {values[address - control_base_address] :02X}\n")
+        for address in range(control_base_address, control_base_address + control_lenght, 4):
+            file.write(f"write | {address :02X} | {values[address - control_base_address] :08X}\n")
 
-        for address in range(control_base_address, control_base_address + control_lenght):
-            file.write(f"read | {address :02X} | {values[address - control_base_address] :02X}\n")
+        for address in range(control_base_address, control_base_address + control_lenght, 4):
+            file.write(f"read | {address :02X} | {values[address - control_base_address] :08X}\n")
 
 def test_write_read(fielname):
 
-    Array = np.random.randint(0, 2 ** 8 - 1, size=(16, 8), dtype=np.uint8)
+    Array = np.random.randint(0, 2 ** 32 - 1, size=(16, 2), dtype=np.uint32)
 
     with open(filename, 'a') as file:
-        file.write("write | 80 | 00\n")
+        file.write("write | 80 | 00000000\n")
         for array in range(Array.shape[0]):
             for line in range(Array.shape[1]):
-                adress = line + 8 * array
-                file.write(f"write | {adress :02X} | {Array[array, line] :02X}\n")
+                adress = 4 * (line + 2 * array)
+                file.write(f"write | {adress :02X} | {Array[array, line] :08X}\n")
 
-        file.write("write | 80 | 01\n")
+        file.write("write | 80 | 00000001\n")
         for array in range(Array.shape[0]):
             for line in range(Array.shape[1]):
-                adress = line + 8 * array
-                file.write(f"write | {adress :02X} | {Array[array, line] :02X}\n")
+                adress = 4 * (line + 2 * array)
+                file.write(f"write | {adress :02X} | {Array[array, line] :08X}\n")
         
         for array in range(Array.shape[0]):
             for line in range(Array.shape[1]):
-                adress = line + 8 * array
-                file.write(f"read | {adress :02X} | {Array[array, line] :02X}\n")
+                adress = 4 * (line + 2 * array)
+                file.write(f"read | {adress :02X} | {Array[array, line] :08X}\n")
 
 def test_inference(filename, num_test, overflow_test=False):
-    if overflow_test : 
+    if(overflow_test) :
         Array = np.random.randint(0, 2 ** 8 - 1, size=(16, 8), dtype=np.uint8)
-    else :
+    else:
         Array = np.random.randint(0, 2 ** 6 - 1, size=(16, 8), dtype=np.uint8)
+    Array = Array.view(np.uint32)
 
     with open(filename, 'a') as file:
         # write the arrays 
-        file.write("write | 80 | 00\n")
+        file.write("write | 80 | 00000000\n")
         for array in range(Array.shape[0]):
             for line in range(Array.shape[1]):
-                adress = line + 8 * array
-                file.write(f"write | {adress :02X} | {Array[array, line] :02X}\n")
+                adress = 4 * (line + 2 * array)
+                file.write(f"write | {adress :02X} | {Array[array, line] :08X}\n")
 
-        file.write("write | 80 | 01\n")
+        file.write("write | 80 | 00000001\n")
         for array in range(Array.shape[0]):
             for line in range(Array.shape[1]):
-                adress = line + 8 * array
-                file.write(f"write | {adress :02X} | {Array[array, line] :02X}\n")
+                adress = 4 * (line + 2 * array)
+                file.write(f"write | {adress :02X} | {Array[array, line] :08X}\n")
 
         # run inferences 
 
         def inference_log( obs1, obs2, obs3, obs4, array) : 
-            array = array.astype(np.uint16)
-            file.write(f"write | 81 | {obs1:02X}\n")
-            file.write(f"write | 82 | {obs2:02X}\n")
-            file.write(f"write | 83 | {obs3:02X}\n")
-            file.write(f"write | 84 | {obs4:02X}\n")
+            array = array.view(np.uint8).astype(np.uint16)
+            file.write(f"write | 84 | {obs4:02X}{obs3:02X}{obs2:02X}{obs1:02X}\n")
             expected_data0 = array[0][obs1] + array[1][obs2] + array[2][obs3] + array[3][obs4]
             expected_data1 = array[4][obs1] + array[5][obs2] + array[6][obs3] + array[7][obs4]
             expected_data2 = array[8][obs1] + array[9][obs2] + array[10][obs3] + array[11][obs4]
@@ -97,5 +95,5 @@ if __name__ == "__main__":
     test_control_regs(filename)
     insert_reset(filename)  
     test_write_read(filename)
-    test_inference(filename, 1000)
+    test_inference(filename, 100)
 

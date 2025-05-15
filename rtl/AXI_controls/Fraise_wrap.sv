@@ -1,4 +1,4 @@
-`include "adam/macros.svh"
+`include "macros.svh"
 
 module Fraise_wrap #(
     `ADAM_CFG_PARAMS

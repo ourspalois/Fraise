@@ -28,17 +28,17 @@ module chip_control #(
     logic read_mem, read_regs, read_result, write_mem, write_regs;
     logic [31:0] read_addr, write_addr;
     logic [31:0] write_data;
-    logic [7:0] read_data;
+    logic [31:0] read_data;
 
     // registers 
     typedef struct packed {
-    logic [7:0] empty_2 ;
-    logic [7:0] empty_1 ;
-    logic [7:0] empty_0 ;
     logic [7:0] obs_3 ;
     logic [7:0] obs_2 ; 
     logic [7:0] obs_1 ;
     logic [7:0] obs_0 ;
+    logic [7:0] empty_2 ;
+    logic [7:0] empty_1 ;
+    logic [7:0] empty_0 ;
     logic [7:0] set_reset_mode ; // Now LSB (bit [7:0])
     } control_registers_t;
     control_registers_t control_registers; // written by AXI
@@ -74,6 +74,7 @@ module chip_control #(
     logic read_pulse_counter ;
     logic [10:0]  read_output_count ; 
     logic [15:0] write_counter, write_pulse_counter, write_precharge_counter ;
+    logic [2:0] read_count ; 
         
     // AXI interface process 
     always_ff @(posedge clk) begin
@@ -119,9 +120,9 @@ module chip_control #(
       if(axi_port.r_ready) begin
         if(read_regs) begin
           if(read_addr < 32'h0088) begin
-            axi_port.r_data <= control_registers[ ({3'b000, read_addr[0+:3]} <<3 ) +:8];
+            axi_port.r_data <= control_registers[ ({3'b000, read_addr[0+:3]} <<3 ) +:32];
           end else begin
-            axi_port.r_data <= status_registers[ (read_addr[0+:2] << 3) +:8];
+            axi_port.r_data <= status_registers[ (read_addr[0+:2] << 3) +:32];
           end
           axi_port.r_valid <= 1'b1;
           axi_port.r_resp <= 2'b00;
@@ -131,7 +132,7 @@ module chip_control #(
           axi_port.r_valid <= 1'b1;
           axi_port.r_resp <= 2'b00;
           read_result <= 1'b0;
-        end else if(read_mem && read_output_count >= 12) begin
+        end else if(read_mem && read_count==4 ) begin
           axi_port.r_data <= read_data;
           axi_port.r_valid <= 1'b1;
           axi_port.r_resp <= 2'b00;
@@ -160,7 +161,7 @@ module chip_control #(
       // write response management
       if(write_regs && axi_port.b_ready) begin
         if (write_addr !=0) begin
-          control_registers[({3'b000, write_addr[0+:4]} << 3) +: 8] <= write_data[0+:8];
+          control_registers[({3'b000, write_addr[0+:4]} << 3) +: 32] <= write_data;
         end
         axi_port.b_valid <= 1'b1;
         axi_port.b_resp <= 2'b00;
@@ -185,22 +186,31 @@ module chip_control #(
             read_output_count <= 0;
             inference_read_count <= 0;
             status_registers <= 'b0;
+            read_count <= 0;
+            read_data <= 'b0;
         end else begin
           case(state)
             IDLE : begin
               write_counter <= 0;
               read_output_count <= 0;
               inference_read_count <= 0;
+              read_count <= 0;
             end
             WRITE_BUFFER : begin
               write_counter <= write_counter + 1;
+            end
+            READ_SETUP : begin
+              read_output_count <= 0;
             end
             READ_INFERENCE : begin
               read_output_count <= read_output_count + 1;
             end
             READ_OUT : begin
               read_output_count <= read_output_count + 1;
-              read_data <= (read_data<<1) | 1'(DATA_out[read_addr[6:5]]);
+              read_data[read_count*8+:8] <= (read_data[read_count*8+:8]<<1) | 1'(DATA_out[read_addr[6:5]]);
+              if(read_output_count == 11) begin
+                read_count <= read_count + 1;
+              end 
             end
 
             INF_WL_FALL : begin 
@@ -252,7 +262,7 @@ module chip_control #(
           next_state <= WRITE_BUFFER;
         end
         WRITE_BUFFER : begin
-          if(write_counter == 7) begin
+          if(write_counter == 31) begin
             next_state <= IDLE;
           end else begin
             next_state <= WRITE_SETUP ; 
@@ -279,7 +289,12 @@ module chip_control #(
         end
         READ_OUT : begin
           if(read_output_count >= 11) begin
-            next_state <= IDLE;
+            if(read_count >= 3) begin
+              next_state <= IDLE;
+            end
+            else begin
+              next_state <= READ_SETUP;
+            end
           end else begin
             next_state <= READ_OUT;
           end
@@ -329,30 +344,30 @@ module chip_control #(
           adr_full_row_in <= 5'b0;
         end
         WRITE_SETUP : begin
-          CBL0 <= write_data[write_counter[2:0]];
+          CBL0 <= write_data[write_counter[4:0]];
           CBLEN0 <= 1'b1;
           CSL0 <= control_registers.set_reset_mode[0];
           CWL0 <= 1'b0;
           instructions_in <= 2'b11;
-          adr_full_col_in <= {write_addr[4:3], write_addr[0+:3]};
+          adr_full_col_in <= {write_addr[4:3], write_addr[2], write_counter[4:3]};
           adr_full_row_in <= {write_addr[6:5], write_counter[0+:3]};
         end
         WRITE_ASSERT_CWL : begin
-          CBL0 <= write_data[write_counter[2:0]];
+          CBL0 <= write_data[write_counter[4:0]];
           CBLEN0 <= 1'b1;
           CSL0 <= control_registers.set_reset_mode[0];
           CWL0 <= 1'b1;
           instructions_in <= 2'b11;
-          adr_full_col_in <= {write_addr[4:3], write_addr[0+:3]};
+          adr_full_col_in <= {write_addr[4:3], write_addr[2], write_counter[4:3]};
           adr_full_row_in <= {write_addr[6:5], write_counter[0+:3]};
         end
         WRITE_BUFFER : begin
-          CBL0 <= write_data[write_counter[2:0]];
+          CBL0 <= write_data[write_counter[4:0]];
           CBLEN0 <= 1'b1;
           CSL0 <= control_registers.set_reset_mode[0];
           CWL0 <= 1'b0;
           instructions_in <= 2'b11;
-          adr_full_col_in <= {write_addr[4:3], write_addr[0+:3]};
+          adr_full_col_in <= {write_addr[4:3], write_addr[2], write_counter[4:3]};
           adr_full_row_in <= {write_addr[6:5], write_counter[0+:3]};
         end
 
@@ -362,7 +377,7 @@ module chip_control #(
           CSL0 <= 1'b0;
           CWL0 <= 1'b0;
           instructions_in <= 2'b10;
-          adr_full_col_in <= {read_addr[4:3], read_addr[0+:3]};
+          adr_full_col_in <= {read_addr[4:3], read_addr[2], read_count[1:0]};
           adr_full_row_in <= {read_addr[6:5], 3'b0};
         end
         READ_ASSERT_SL_WL : begin
@@ -371,7 +386,7 @@ module chip_control #(
           CSL0 <= 1'b1;
           CWL0 <= 1'b1;
           instructions_in <= 2'b10;
-          adr_full_col_in <= {read_addr[4:3], read_addr[0+:3]};
+          adr_full_col_in <= {read_addr[4:3], read_addr[2], read_count[1:0]};
           adr_full_row_in <= {read_addr[6:5], 3'b0};
         end
         READ_SL_FALL : begin
@@ -380,7 +395,7 @@ module chip_control #(
           CSL0 <= 1'b0;
           CWL0 <= 1'b1;
           instructions_in <= 2'b10;
-          adr_full_col_in <= {read_addr[4:3], read_addr[0+:3]};
+          adr_full_col_in <= {read_addr[4:3], read_addr[2], read_count[1:0]};
           adr_full_row_in <= {read_addr[6:5], 3'b0};
         end
         READ_WL_BUFFER : begin
@@ -389,7 +404,7 @@ module chip_control #(
           CSL0 <= 1'b0;
           CWL0 <= 1'b1;
           instructions_in <= 2'b10;
-          adr_full_col_in <= {read_addr[4:3], read_addr[0+:3]};
+          adr_full_col_in <= {read_addr[4:3], read_addr[2], read_count[1:0]};
           adr_full_row_in <= {read_addr[6:5], 3'b0};
         end
         READ_WL_FALL : begin
@@ -398,7 +413,7 @@ module chip_control #(
           CSL0 <= 1'b0;
           CWL0 <= 1'b0;
           instructions_in <= 2'b01; 
-          adr_full_col_in <= {read_addr[4:3], read_addr[0+:3]};
+          adr_full_col_in <= {read_addr[4:3], read_addr[2], read_count[1:0]};
           adr_full_row_in <= {read_addr[6:5], 3'b0};
         end
         READ_INFERENCE : begin

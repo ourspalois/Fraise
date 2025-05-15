@@ -1,0 +1,759 @@
+m255
+K4
+z2
+13
+!s112 1.1
+!i10d 8192
+!i10e 25
+!i10f 100
+cModel Technology
+Z0 d/home/theob/small_bayes_chip/Fraise/tests/memory_tests
+T_opt
+!s110 1747309792
+VT:7G1?VdDi1HPFEX:WI:j1
+04 15 4 work tb_chip_control fast 0
+=1-000ae431a4f1-6825d4e0-2bd40-11dd63
+o-quiet -auto_acc_if_foreign -work memory_test -suppress 3009 +acc
+Z1 tCvgOpt 0
+n@_opt
+OL;O;10.7g;67
+R0
+Xadam_cfg_pkg
+Z2 DXx6 sv_std 3 std 0 22 d=_JfHTnXCN[H5FjiaJJc0
+Z3 !s110 1747309842
+!i10b 1
+!s100 FoGcRAC2?U[6a9@^o_k410
+IJ<jH@BG^_XboeMb;0HAbB1
+VJ<jH@BG^_XboeMb;0HAbB1
+S1
+R0
+w1747302448
+8../../include/adam_cfg_pkg.sv
+F../../include/adam_cfg_pkg.sv
+L0 22
+Z4 OL;L;10.7g;67
+r1
+!s85 0
+31
+Z5 !s108 1747309842.000000
+!s107 ../../libs/axi/include/axi/assign.svh|../../include/macros.svh|tb_controls.sv|../../include/chip_intf.sv|../../include/adam_intf_seq.sv|../../include/adam_cfg_pkg.sv|../../rtl/AXI_controls/Fraise_wrap.sv|../../rtl/AXI_controls/chip_controls.sv|../../rtl/rtl_chip/register_out.sv|../../rtl/rtl_chip/likelihood.sv|../../rtl/rtl_chip/decoder_top.sv|../../rtl/rtl_chip/decoder_right.sv|../../rtl/rtl_chip/decoder_left.sv|../../rtl/rtl_chip/decoder_bot.sv|../../rtl/rtl_chip/compteur.sv|../../rtl/rtl_chip/bot_logic_log.sv|../../rtl/rtl_chip/Bayesian_log2.sv|../../rtl/rtl_chip/array_decoder_top.sv|../../rtl/rtl_chip/array_decoder_left.sv|../../rtl/rtl_chip/additions.sv|
+Z6 !s90 -work|memory_test|-sv|+incdir+../../rtl/rtl_chip|+incdir+../../rtl/AXI_controls|+incdir+../../include|+incdir+../../libs/axi/include|../../rtl/rtl_chip/additions.sv|../../rtl/rtl_chip/array_decoder_left.sv|../../rtl/rtl_chip/array_decoder_top.sv|../../rtl/rtl_chip/Bayesian_log2.sv|../../rtl/rtl_chip/bot_logic_log.sv|../../rtl/rtl_chip/compteur.sv|../../rtl/rtl_chip/decoder_bot.sv|../../rtl/rtl_chip/decoder_left.sv|../../rtl/rtl_chip/decoder_right.sv|../../rtl/rtl_chip/decoder_top.sv|../../rtl/rtl_chip/likelihood.sv|../../rtl/rtl_chip/register_out.sv|../../rtl/AXI_controls/chip_controls.sv|../../rtl/AXI_controls/Fraise_wrap.sv|../../include/adam_cfg_pkg.sv|../../include/adam_intf_seq.sv|../../include/chip_intf.sv|tb_controls.sv|
+!i113 0
+Z7 o-work memory_test -sv -L mtiAvm -L mtiRnm -L mtiOvm -L mtiUvm -L mtiUPF -L infact
+Z8 !s92 -work memory_test -sv +incdir+../../rtl/rtl_chip +incdir+../../rtl/AXI_controls +incdir+../../include +incdir+../../libs/axi/include -L mtiAvm -L mtiRnm -L mtiOvm -L mtiUvm -L mtiUPF -L infact
+R1
+YADAM_SEQ
+R2
+R3
+!i10b 1
+!s100 ;g<IIkkdk4[9cPcMW7BJ<2
+IEE;CSAV6QVAzbD2Fb?g072
+Z9 VDg1SIo80bB@j0V0VzS_@n1
+!s105 adam_intf_seq_sv_unit
+S1
+R0
+Z10 w1747300899
+8../../include/adam_intf_seq.sv
+F../../include/adam_intf_seq.sv
+L0 1
+R4
+r1
+!s85 0
+31
+R5
+Z11 !s107 ../../libs/axi/include/axi/assign.svh|../../include/macros.svh|tb_controls.sv|../../include/chip_intf.sv|../../include/adam_intf_seq.sv|../../include/adam_cfg_pkg.sv|../../rtl/AXI_controls/Fraise_wrap.sv|../../rtl/AXI_controls/chip_controls.sv|../../rtl/rtl_chip/register_out.sv|../../rtl/rtl_chip/likelihood.sv|../../rtl/rtl_chip/decoder_top.sv|../../rtl/rtl_chip/decoder_right.sv|../../rtl/rtl_chip/decoder_left.sv|../../rtl/rtl_chip/decoder_bot.sv|../../rtl/rtl_chip/compteur.sv|../../rtl/rtl_chip/bot_logic_log.sv|../../rtl/rtl_chip/Bayesian_log2.sv|../../rtl/rtl_chip/array_decoder_top.sv|../../rtl/rtl_chip/array_decoder_left.sv|../../rtl/rtl_chip/additions.sv|
+R6
+!i113 0
+R7
+R8
+R1
+n@a@d@a@m_@s@e@q
+vadditions
+R2
+R3
+!i10b 1
+!s100 ;0Kzhc]RAjMi?N6]EX2901
+IInPE;A?BHfIa@BjL]hHla3
+R9
+!s105 additions_sv_unit
+S1
+R0
+R10
+8../../rtl/rtl_chip/additions.sv
+F../../rtl/rtl_chip/additions.sv
+L0 1
+R4
+r1
+!s85 0
+31
+R5
+R11
+R6
+!i113 0
+R7
+R8
+R1
+varray_decoder_left
+R2
+R3
+!i10b 1
+!s100 KKl6R`0mW28C8mBdP88W[0
+Ich^_?cIK:<<z?>Kaij;6o0
+R9
+!s105 array_decoder_left_sv_unit
+S1
+R0
+R10
+8../../rtl/rtl_chip/array_decoder_left.sv
+F../../rtl/rtl_chip/array_decoder_left.sv
+L0 1
+R4
+r1
+!s85 0
+31
+R5
+R11
+R6
+!i113 0
+R7
+R8
+R1
+varray_decoder_top
+R2
+R3
+!i10b 1
+!s100 aO<:kN?]FcZdViB;W]fj32
+IIL98;KmLQ^n;aObH@B`?I1
+R9
+!s105 array_decoder_top_sv_unit
+S1
+R0
+R10
+8../../rtl/rtl_chip/array_decoder_top.sv
+F../../rtl/rtl_chip/array_decoder_top.sv
+L0 1
+R4
+r1
+!s85 0
+31
+R5
+R11
+R6
+!i113 0
+R7
+R8
+R1
+YAXI_BUS
+R2
+Z12 DXx4 work 7 axi_pkg 0 22 n<i;ag?<PQnbgH@hzUA743
+R3
+!i10b 1
+!s100 mZhPM=d^[f@8h2<P2j>3Q1
+IBeRFjkVRc3RCOS4W<:CQ20
+R9
+Z13 !s105 axi_intf_sv_unit
+S1
+R0
+R10
+Z14 8../../libs/axi/src/axi_intf.sv
+Z15 F../../libs/axi/src/axi_intf.sv
+L0 20
+R4
+r1
+!s85 0
+31
+R5
+Z16 !s107 ../../libs/axi/include/axi/typedef.svh|../../include/adam_cfg_pkg.sv|../../libs/axi/src/axi_intf.sv|
+Z17 !s90 -work|memory_test|-sv|+incdir+../../libs/axi/include|../../libs/axi/src/axi_intf.sv|../../include/adam_cfg_pkg.sv|
+!i113 0
+R7
+Z18 !s92 -work memory_test -sv +incdir+../../libs/axi/include -L mtiAvm -L mtiRnm -L mtiOvm -L mtiUvm -L mtiUPF -L infact
+R1
+n@a@x@i_@b@u@s
+YAXI_BUS_ASYNC
+R2
+R12
+R3
+!i10b 1
+!s100 c:?1YKH>U;7Nn95mhk5OW2
+ILAz7zPdC`9anFa2l03:591
+R9
+R13
+S1
+R0
+R10
+R14
+R15
+L0 259
+R4
+r1
+!s85 0
+31
+R5
+R16
+R17
+!i113 0
+R7
+R18
+R1
+n@a@x@i_@b@u@s_@a@s@y@n@c
+YAXI_BUS_ASYNC_GRAY
+R2
+R12
+R3
+!i10b 1
+!s100 li>QW3ACf=:hkLL7MFkal2
+IodcQWhYbH:843FcVZ;=660
+R9
+R13
+S1
+R0
+R10
+R14
+R15
+L0 349
+R4
+r1
+!s85 0
+31
+R5
+R16
+R17
+!i113 0
+R7
+R18
+R1
+n@a@x@i_@b@u@s_@a@s@y@n@c_@g@r@a@y
+YAXI_BUS_DV
+R2
+R12
+R3
+!i10b 1
+!s100 g1CI?LScGmWJh>hiZfd[o2
+IXo_Se7Jg2dgPkR8f04U;<0
+R9
+R13
+S1
+R0
+R10
+R14
+R15
+L0 113
+R4
+r1
+!s85 0
+31
+R5
+R16
+R17
+!i113 0
+R7
+R18
+R1
+n@a@x@i_@b@u@s_@d@v
+YAXI_LITE
+R2
+R12
+R3
+!i10b 1
+!s100 i?JLA1g^zOle>_l`Fbn]<3
+I`lHXeTTlC6edTBBCkFP^e2
+R9
+R13
+S1
+R0
+R10
+R14
+R15
+L0 400
+R4
+r1
+!s85 0
+31
+R5
+R16
+R17
+!i113 0
+R7
+R18
+R1
+n@a@x@i_@l@i@t@e
+YAXI_LITE_ASYNC_GRAY
+R2
+R12
+R3
+!i10b 1
+!s100 2bTKY8G[C`XX99]gKIncI0
+IgO?VnJ5kL<nN;Q6Y_mYKO2
+R9
+R13
+S1
+R0
+R10
+R14
+R15
+L0 530
+R4
+r1
+!s85 0
+31
+R5
+R16
+R17
+!i113 0
+R7
+R18
+R1
+n@a@x@i_@l@i@t@e_@a@s@y@n@c_@g@r@a@y
+YAXI_LITE_DV
+R2
+R12
+R3
+!i10b 1
+!s100 GJR;cL]ZGai[l5oYblY062
+I3VGd=n??D6`JWbV@BhS?[0
+R9
+R13
+S1
+R0
+R10
+R14
+R15
+L0 464
+R4
+r1
+!s85 0
+31
+R5
+R16
+R17
+!i113 0
+R7
+R18
+R1
+n@a@x@i_@l@i@t@e_@d@v
+Xaxi_pkg
+R2
+R3
+!i10b 1
+!s100 n<IJ>12?Z6d>a<=JGa6cJ0
+In<i;ag?<PQnbgH@hzUA743
+Vn<i;ag?<PQnbgH@hzUA743
+S1
+R0
+R10
+8../../libs/axi/src/axi_pkg.sv
+F../../libs/axi/src/axi_pkg.sv
+L0 21
+R4
+r1
+!s85 0
+31
+R5
+!s107 ../../libs/axi/src/axi_pkg.sv|
+!s90 -work|memory_test|-sv|../../libs/axi/src/axi_pkg.sv|
+!i113 0
+R7
+R1
+vBayesian_log2
+R2
+R3
+!i10b 1
+!s100 Ig<eb5`4DdG]8>MA`mA5_0
+Ing=2:T>M3[Yi9XRL@ODbN0
+R9
+!s105 Bayesian_log2_sv_unit
+S1
+R0
+R10
+8../../rtl/rtl_chip/Bayesian_log2.sv
+F../../rtl/rtl_chip/Bayesian_log2.sv
+L0 1
+R4
+r1
+!s85 0
+31
+R5
+R11
+R6
+!i113 0
+R7
+R8
+R1
+n@bayesian_log2
+vbot_logic_log
+R2
+R3
+!i10b 1
+!s100 8TJ>U5=lgn_92bTA1=7SJ1
+I7nD73ScKncHaBH4h5A^:i0
+R9
+!s105 bot_logic_log_sv_unit
+S1
+R0
+R10
+8../../rtl/rtl_chip/bot_logic_log.sv
+F../../rtl/rtl_chip/bot_logic_log.sv
+L0 1
+R4
+r1
+!s85 0
+31
+R5
+R11
+R6
+!i113 0
+R7
+R8
+R1
+vcell_matrix
+R2
+R3
+!i10b 1
+!s100 ;6jC]U]`Po3c7@8JmR?bX1
+IC>GYDE6UU[m`SN;kjbb]K1
+R9
+Z19 !s105 MC_8x8_upd_sv_unit
+S1
+R0
+R10
+Z20 8../../rtl/rtl_chip/RRAM_arrays/MC_8x8_upd.sv
+Z21 F../../rtl/rtl_chip/RRAM_arrays/MC_8x8_upd.sv
+L0 109
+R4
+r1
+!s85 0
+31
+R5
+Z22 !s107 ../../rtl/rtl_chip/RRAM_arrays/MC_8x8_upd.sv|
+Z23 !s90 -work|memory_test|-sv|../../rtl/rtl_chip/RRAM_arrays/MC_8x8_upd.sv|
+!i113 0
+R7
+R1
+vchip_control
+R2
+Z24 DXx4 work 12 adam_cfg_pkg 0 22 28>5JHL>gk8;M4FZz:HBz3
+R3
+!i10b 1
+!s100 Jf]8lWU[21HM0nR3`2WDa0
+I=M3;N?[L3@IIo>[QjkoJK3
+R9
+!s105 chip_controls_sv_unit
+S1
+R0
+w1747309789
+8../../rtl/AXI_controls/chip_controls.sv
+F../../rtl/AXI_controls/chip_controls.sv
+L0 3
+R4
+r1
+!s85 0
+31
+R5
+R11
+R6
+!i113 0
+R7
+R8
+R1
+Ychip_ports
+R2
+R3
+!i10b 1
+!s100 BN:>>Nz76l3S2mhAVOSSV2
+IkAQ<HZgdFnAgR0<j00j>33
+R9
+!s105 chip_intf_sv_unit
+S1
+R0
+R10
+8../../include/chip_intf.sv
+F../../include/chip_intf.sv
+L0 1
+R4
+r1
+!s85 0
+31
+R5
+R11
+R6
+!i113 0
+R7
+R8
+R1
+vcompteur
+R2
+R3
+!i10b 1
+!s100 AE1Kd;_WQ^`?]g]Nc4HFR0
+IiXGH9lnRfQD=NN?4>C^3:2
+R9
+!s105 compteur_sv_unit
+S1
+R0
+R10
+8../../rtl/rtl_chip/compteur.sv
+F../../rtl/rtl_chip/compteur.sv
+L0 1
+R4
+r1
+!s85 0
+31
+R5
+R11
+R6
+!i113 0
+R7
+R8
+R1
+vdecoder_bot
+R2
+R3
+!i10b 1
+!s100 ]H0=gaJ89meONMLa[8FXE2
+I@EQ]Sdo33P<R:`aNi>UA32
+R9
+!s105 decoder_bot_sv_unit
+S1
+R0
+R10
+8../../rtl/rtl_chip/decoder_bot.sv
+F../../rtl/rtl_chip/decoder_bot.sv
+L0 1
+R4
+r1
+!s85 0
+31
+R5
+R11
+R6
+!i113 0
+R7
+R8
+R1
+vdecoder_left
+R2
+R3
+!i10b 1
+!s100 D]6PSaKWbo;RRn30ADio23
+I^Vjz=@bQHLoLn23dULz4i0
+R9
+!s105 decoder_left_sv_unit
+S1
+R0
+R10
+8../../rtl/rtl_chip/decoder_left.sv
+F../../rtl/rtl_chip/decoder_left.sv
+L0 1
+R4
+r1
+!s85 0
+31
+R5
+R11
+R6
+!i113 0
+R7
+R8
+R1
+vdecoder_right
+R2
+R3
+!i10b 1
+!s100 G>Rz09b3EzmN<YgXeMml]1
+ILm47EfNV>mog`AmT@9>O]3
+R9
+!s105 decoder_right_sv_unit
+S1
+R0
+R10
+8../../rtl/rtl_chip/decoder_right.sv
+F../../rtl/rtl_chip/decoder_right.sv
+L0 1
+R4
+r1
+!s85 0
+31
+R5
+R11
+R6
+!i113 0
+R7
+R8
+R1
+vdecoder_top
+R2
+R3
+!i10b 1
+!s100 Hn^G=:W=5S`E[;bz8A>L^1
+II77ohWUB`@Ya9z_Wj7J>T3
+R9
+!s105 decoder_top_sv_unit
+S1
+R0
+R10
+8../../rtl/rtl_chip/decoder_top.sv
+F../../rtl/rtl_chip/decoder_top.sv
+L0 1
+R4
+r1
+!s85 0
+31
+R5
+R11
+R6
+!i113 0
+R7
+R8
+R1
+vFraise_wrap
+R2
+R24
+R3
+!i10b 1
+!s100 Y42EVfzF0H^UG@g_il]0B0
+IV^L?YPP8K?NYF^GNACzJO3
+R9
+!s105 Fraise_wrap_sv_unit
+S1
+R0
+w1747302109
+8../../rtl/AXI_controls/Fraise_wrap.sv
+F../../rtl/AXI_controls/Fraise_wrap.sv
+L0 3
+R4
+r1
+!s85 0
+31
+R5
+R11
+R6
+!i113 0
+R7
+R8
+R1
+n@fraise_wrap
+vlikelihood
+R2
+R3
+!i10b 1
+!s100 TZ1]HSBl42ZZamh?DC7l41
+I]W:hgSJac:NXE_4DXmmQ70
+R9
+!s105 likelihood_sv_unit
+S1
+R0
+R10
+8../../rtl/rtl_chip/likelihood.sv
+F../../rtl/rtl_chip/likelihood.sv
+L0 1
+R4
+r1
+!s85 0
+31
+R5
+R11
+R6
+!i113 0
+R7
+R8
+R1
+vline_matrix
+R2
+R3
+!i10b 1
+!s100 d6lLB@cGY?IV6kJE`S?_h2
+I^YD;OdjQS_d61[zfTgC7A3
+R9
+R19
+S1
+R0
+R10
+R20
+R21
+L0 83
+R4
+r1
+!s85 0
+31
+R5
+R22
+R23
+!i113 0
+R7
+R1
+vMC_8x8_FULL_upd
+R2
+R3
+!i10b 1
+!s100 9fGkQh;P^81Q9]Kl[`6<T3
+I`=KOGQcLA3jOJR5h;SYIf0
+R9
+R19
+S1
+R0
+R10
+R20
+R21
+L0 1
+R4
+r1
+!s85 0
+31
+R5
+R22
+R23
+!i113 0
+R7
+R1
+n@m@c_8x8_@f@u@l@l_upd
+vregister_out
+R2
+R3
+!i10b 1
+!s100 f@K@^hMUdfKOS=P^56jg30
+IK`m^]NYZ=eGz1PlTNVoX71
+R9
+!s105 register_out_sv_unit
+S1
+R0
+R10
+8../../rtl/rtl_chip/register_out.sv
+F../../rtl/rtl_chip/register_out.sv
+L0 1
+R4
+r1
+!s85 0
+31
+R5
+R11
+R6
+!i113 0
+R7
+R8
+R1
+vtb_chip_control
+R2
+R3
+!i10b 1
+!s100 4e;QkQ:Y[SUY]a8h]akRV1
+I7SNVJ5S]gcCIVXa]CZYnm1
+R9
+!s105 tb_controls_sv_unit
+S1
+R0
+R10
+8tb_controls.sv
+Ftb_controls.sv
+L0 3
+R4
+r1
+!s85 0
+31
+R5
+R11
+R6
+!i113 0
+R7
+R8
+R1
