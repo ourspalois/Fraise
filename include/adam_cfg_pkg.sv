@@ -6,10 +6,10 @@
  *
  * This SystemVerilog package was auto-generated.
  *
- * Date   : 2025-01-24 09:33:57 UTC
- * Target : default
- * Branch : c2n_collab
- * Commit : 2c845efca1f8f7ef1a5b9f61f5a2fba8f7c0c1c5 (dirty)
+ * Date   : 2025-04-30 13:45:28 UTC
+ * Target : adam_nexys_video
+ * Branch : small_bayes
+ * Commit : b92ae9aef00dd24d070eeea308174a92f902f3aa (dirty)
  *
  * It is not recommended to modify this this file. 
  * ============================================================================
@@ -50,6 +50,7 @@ package adam_cfg_pkg;
         int NO_LSPA_SPIS;
         int NO_LSPA_TIMERS;
         int NO_LSPA_UARTS;
+        int NO_LSPA_APB;
 
         int NO_LSPB_GPIOS;
         int NO_LSPB_SPIS;
@@ -72,6 +73,7 @@ package adam_cfg_pkg;
         MMAP_T MMAP_LSPA;
         MMAP_T MMAP_LSPB;
         MMAP_T MMAP_ACCEL;
+        MMAP_T MMAP_ACCEL_PWR;          
 
         ADDR_T MMAP_BOUNDRY;
 
@@ -94,13 +96,14 @@ package adam_cfg_pkg;
         
         EN_LPCPU : 1,
         EN_LPMEM : 1,
-        EN_DEBUG : 1,
+        EN_DEBUG : 0,
         EN_ACCEL : 1,
         
         NO_LSPA_GPIOS  : 1,
         NO_LSPA_SPIS   : 1,
         NO_LSPA_TIMERS : 1,
         NO_LSPA_UARTS  : 1,
+        NO_LSPA_APB    : 1,
 
         NO_LSPB_GPIOS  : 0,
         NO_LSPB_SPIS   : 0,
@@ -123,6 +126,7 @@ package adam_cfg_pkg;
         MMAP_LSPA   : '{32'h00010000, 32'h00018000, 32'h00000400},
         MMAP_LSPB   : '{32'h00018000, 32'h00020000, 32'h00000400},
         MMAP_ACCEL  : '{32'h00020000, 32'h00024000, '0},
+        MMAP_ACCEL_PWR : '{32'h00024000, 32'h00024800, '0},
 
         MMAP_BOUNDRY : 32'h00080000,
 
