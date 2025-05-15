@@ -17,7 +17,7 @@ module Fraise_wrap #(
         .seq_port(seq_port),
         .axi_port(axi_slave[1])
         `ifdef SYNTHESIS 
-        ,chip_port(chip_port)
+        ,.chip_port(chip_port)
         `endif 
     ) ; 
 

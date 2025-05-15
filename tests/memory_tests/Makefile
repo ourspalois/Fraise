@@ -1,6 +1,6 @@
 #conda env name with a running jax install 
 # cause I need jax (because I am a crackhead)
-CONDA_ENV = VSIM_TESTS
+CONDA_ENV = base
 HOME := ../../
 
 #list of sv files : testbench.sv and everything in .sv in rtl/
