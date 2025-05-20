@@ -95,7 +95,6 @@ module chip_control #(
       read_result <= 1'b0;
       write_mem <= 1'b0;
       write_regs <= 1'b0;
-      read_data <= 'b0;
       read_addr <= 'b0;
       write_data <= 'b0;
       write_addr <= 'b0;
@@ -328,6 +327,9 @@ module chip_control #(
           end else begin
             next_state <= INF_READ_OUT;
           end
+        end
+        default : begin
+          next_state <= IDLE;
         end
       endcase
     end
