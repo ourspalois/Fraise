@@ -207,9 +207,15 @@ module chip_control #(
             READ_OUT : begin
               read_output_count <= read_output_count + 1;
               read_data[read_count*8+:8] <= (read_data[read_count*8+:8]<<1) | 1'(DATA_out[read_addr[6:5]]);
+              `ifdef VIVADO // taking into account the hold violation on the output buffers of the chip
+              if(read_output_count == 10) begin
+                read_count <= read_count + 1;
+              end 
+              `else 
               if(read_output_count == 11) begin
                 read_count <= read_count + 1;
               end 
+              `endif
             end
 
             INF_WL_FALL : begin 
@@ -287,7 +293,7 @@ module chip_control #(
           next_state <= READ_OUT;
         end
         READ_OUT : begin
-          if(read_output_count >= 11) begin
+          if(read_output_count >= 10) begin
             if(read_count >= 3) begin
               next_state <= IDLE;
             end
