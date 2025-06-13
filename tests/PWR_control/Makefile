@@ -14,10 +14,7 @@ LIB = memory_test
 # ModelSim options
 VSIM_FLAGS = -voptargs="+acc"
 
-all: gen_test_vectors $(LIB) compile simulate
-
-gen_test_vectors:
-	conda run -n $(CONDA_ENV) python3 gen_test.py
+all: $(LIB) compile simulate gen_fst
 
 $(LIB):
 	vlib $(LIB)
@@ -27,10 +24,13 @@ compile: $(LIB)
 	vlog -work $(LIB) -sv $(HOME)libs/axi/src/axi_pkg.sv
 	vlog -work $(LIB) -sv +incdir+$(HOME)libs/axi/include $(HOME)libs/axi/src/axi_intf.sv $(HOME)include/adam_cfg_pkg.sv
 #stopped test here 
-	vlog -work $(LIB) -sv $(SV_INCLUDE) +incdir+$(HOME)libs/axi/include $(SV_FILES) tb_controls.sv
+	vlog -work $(LIB) -sv $(SV_INCLUDE) +incdir+$(HOME)libs/axi/include $(SV_FILES) testbench.sv
 
 simulate: compile
-	vsim -c -lib $(LIB) -suppress 3009 $(VSIM_FLAGS) -do wave.cmd tb_chip_control
+	vsim -c -lib $(LIB) -suppress 3009 $(VSIM_FLAGS) -do wave.cmd tb_PWR_controls
+
+gen_fst: simulate
+	vcd2fst -v banzai.vcd -f banzai.fst
 
 clean:
 	rm -r $(LIB)

@@ -3,3 +3,7 @@ __pycache__
 *.vcd
 transcript
 test_vectors.txt
+*.wlf
+*.qdb
+*.qpg
+*.fst
