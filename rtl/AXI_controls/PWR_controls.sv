@@ -12,10 +12,8 @@ module PWR_CTRL #(
 
   logic clk ; 
   assign clk = seq_port.clk;
-  logic rst_n ;
-  assign rst_n = ~seq_port.rst;
 
-  reg [31:0] registers [0:reg_num-1]; // 8 registers of 32 bits
+  reg [31:0] registers [0:reg_num-1]; // 16 registers of 32 bits
   //0 : state 
   // for the pwr registers I use 4bits for components adressing, and 2 bit for the state (so 5 updates on state change max )
 
@@ -79,9 +77,10 @@ module PWR_CTRL #(
       registers[11] <= 32'h0 ;
       registers[12] <= 32'h1 ;
       registers[13] <= 32'h2 ;
-      registers[14] <= 32'h3 ;
+      registers[14] <= 32'h0 ;
 
       registers[15] <= 32'h00_00_00_00; ;
+
 
       axi_port.r_valid <= 1'b0;
       axi_port.b_valid <= 1'b0;
@@ -113,7 +112,7 @@ module PWR_CTRL #(
       // read response management
       if(axi_port.r_ready) begin
         if(read_regs) begin
-          axi_port.r_data <= registers[read_addr[0+:3]];
+          axi_port.r_data <= registers[read_addr[0+:4]];
           axi_port.r_valid <= 1'b1;
           axi_port.r_resp <= 0;
           read_regs <= 1'b0;
@@ -184,6 +183,9 @@ module PWR_CTRL #(
     alert = 'b0;
   end
 
+  logic [1:0] min_index;
+  logic [7:0] v0, v1, v2, v3;
+
   always_ff @( posedge clk) begin 
     if(seq_port.rst) begin
       state <= IDLE;
@@ -210,9 +212,26 @@ module PWR_CTRL #(
         end
         COMPUTE: begin
           if(compute_done) begin
-            if(result[0+:8] >= registers[15][0+:8] || result[8+:8] >= registers[15][8+:8] || result[16+:8] >= registers[15][16+:8] || result[24+:8] >= registers[15][24+:8]) begin
+            $display("PWR_CTRL : COMPUTE done, result = %h", result);
+            v0 = result[7:0];
+            v1 = result[15:8];
+            v2 = result[23:16];
+            v3 = result[31:24];
+
+            if (v0 <= v1 && v0 <= v2 && v0 <= v3) begin
+              min_index = 2'd0;
+            end else if (v1 <= v0 && v1 <= v2 && v1 <= v3) begin
+              min_index = 2'd1;
+            end else if (v2 <= v0 && v2 <= v1 && v2 <= v3) begin
+              min_index = 2'd2;
+            end else begin
+              min_index = 2'd3;
+            end
+            $display("PWR_CTRL : min_index = %d", min_index);
+            if(min_index != 0) begin
               state <= IDLE ;
-              $display("PWR_CTRL : IDLE state, waiting for launch signal");
+              registers[14] <= 32'h00_00_00_01 ; 
+              $display("PWR_CTRL : triger WAKEUP, going IDLE");
             end else begin
               state <= WAIT ; 
               $display("PWR_CTRL : WAIT state");
@@ -351,7 +370,7 @@ module PWR_CTRL #(
           end
           GET: begin
             axi_read_req <= 1;
-            axi_read_addr <= MMAP_ACCEL.start + 32'h2000 ;
+            axi_read_addr <= MMAP_ACCEL.start + 32'h88 ;
             fsm_req <= 0;
             fsm_adress <= 32'h0;
             fsm_data <= 32'h0;
@@ -434,7 +453,7 @@ module PWR_CTRL #(
       maestro_req <= 0;
     end else begin 
       old_state <= state;
-      if(old_state != state && registers[1 + transition_number][0+:6] != 6'b11_1111) begin
+      if((old_state != state) && (registers[1 + transition_number][0+:6] != 6'b11_1111)) begin
         pwr_ctrl_en <= 1;
         case (old_state)
           IDLE: pwr_transition <= 8'h0;

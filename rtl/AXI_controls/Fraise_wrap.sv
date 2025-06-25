@@ -10,8 +10,6 @@ module Fraise_wrap #(
     ,chip_ports.Master chip_port
     `endif 
 );
-    `ADAM_AXIL_SLV_TIE_OFF(axi_slave[0]);
-    `ADAM_AXIL_MST_TIE_OFF(axi_master);
 
     chip_control #() controls (
         .seq_port(seq_port),
@@ -20,5 +18,11 @@ module Fraise_wrap #(
         ,chip_port(chip_port)
         `endif 
     ) ; 
+
+    PWR_CTRL #() power_ctrl (
+        .seq_port(seq_port),
+        .axi_port(axi_slave[0]),
+        .axi_master(axi_master)
+    );
 
 endmodule
