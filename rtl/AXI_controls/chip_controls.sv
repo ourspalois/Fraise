@@ -95,7 +95,6 @@ module chip_control #(
       read_result <= 1'b0;
       write_mem <= 1'b0;
       write_regs <= 1'b0;
-      read_data <= 'b0;
       read_addr <= 'b0;
       write_data <= 'b0;
       write_addr <= 'b0;
@@ -208,7 +207,7 @@ module chip_control #(
             READ_OUT : begin
               read_output_count <= read_output_count + 1;
               read_data[read_count*8+:8] <= (read_data[read_count*8+:8]<<1) | 1'(DATA_out[read_addr[6:5]]);
-              if(read_output_count == 11) begin
+              if(read_output_count == 10) begin
                 read_count <= read_count + 1;
               end 
             end
@@ -243,7 +242,7 @@ module chip_control #(
     always_comb begin 
       case (state) 
         IDLE : begin 
-          if( read_output_count >= 12) begin
+          if( read_output_count >= 11) begin
             next_state <= IDLE;
           end else if(write_mem) begin
             next_state <= WRITE_SETUP;                    
@@ -288,7 +287,7 @@ module chip_control #(
           next_state <= READ_OUT;
         end
         READ_OUT : begin
-          if(read_output_count >= 11) begin
+          if(read_output_count >= 10) begin
             if(read_count >= 3) begin
               next_state <= IDLE;
             end
@@ -323,7 +322,7 @@ module chip_control #(
           next_state <= INF_READ_OUT;
         end
         INF_READ_OUT : begin
-          if(read_output_count >= 11) begin
+          if(read_output_count >= 10) begin
             next_state <= IDLE;
           end else begin
             next_state <= INF_READ_OUT;
