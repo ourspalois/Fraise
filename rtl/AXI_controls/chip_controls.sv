@@ -612,8 +612,8 @@ module chip_control #(
         assign chip_port.CSL0 = CSL0;
         assign chip_port.CWL0 = CWL0;
         assign chip_port.instructions_in = instructions_in;
-        assign chip_port.adr_full_col_in = adr_full_col_in;
-        assign chip_port.adr_full_row_in = adr_full_row_in;
+        assign chip_port.addr_full_col = adr_full_col_in;
+        assign chip_port.addr_full_row = adr_full_row_in;
         assign DATA_out = chip_port.DATA_out ;
     `endif ;
 

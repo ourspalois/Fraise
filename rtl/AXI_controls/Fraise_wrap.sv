@@ -15,14 +15,17 @@ module Fraise_wrap #(
         .seq_port(seq_port),
         .axi_port(axi_slave[1])
         `ifdef SYNTHESIS 
-        ,chip_port(chip_port)
+        ,.chip_port(chip_port)
         `endif 
     ) ; 
+    `ADAM_AXIL_MST_TIE_OFF(axi_master);
+    `ADAM_AXIL_SLV_TIE_OFF(axi_slave[0]);
 
+    /*
     PWR_CTRL #() power_ctrl (
         .seq_port(seq_port),
         .axi_port(axi_slave[0]),
         .axi_master(axi_master)
-    );
+    );*/
 
 endmodule
