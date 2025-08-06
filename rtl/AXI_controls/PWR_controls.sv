@@ -14,6 +14,7 @@ module PWR_CTRL #(
   assign clk = seq_port.clk;
 
   reg [31:0] registers [0:reg_num-1]; // 16 registers of 32 bits
+  reg [31:0] registers_14 ; 
   //0 : state 
   // for the pwr registers I use 4bits for components adressing, and 2 bit for the state (so 5 updates on state change max )
 
@@ -77,9 +78,8 @@ module PWR_CTRL #(
       registers[11] <= 32'h0 ;
       registers[12] <= 32'h1 ;
       registers[13] <= 32'h2 ;
-      registers[14] <= 32'h0 ;
 
-      registers[15] <= 32'h00_00_00_00; ;
+      registers[15] <= 32'h00_00_00_00; 
 
 
       axi_port.r_valid <= 1'b0;
@@ -112,7 +112,11 @@ module PWR_CTRL #(
       // read response management
       if(axi_port.r_ready) begin
         if(read_regs) begin
-          axi_port.r_data <= registers[read_addr[0+:4]];
+          if(read_addr == 14 )begin
+            axi_port.r_data <= registers_14;
+          end else begin
+            axi_port.r_data <= registers[read_addr[0+:4]];
+          end
           axi_port.r_valid <= 1'b1;
           axi_port.r_resp <= 0;
           read_regs <= 1'b0;
@@ -189,6 +193,7 @@ module PWR_CTRL #(
   always_ff @( posedge clk) begin 
     if(seq_port.rst) begin
       state <= IDLE;
+      registers_14 <= '0 ;
     end else begin
       case (state)
         IDLE: begin
@@ -230,7 +235,7 @@ module PWR_CTRL #(
             $display("PWR_CTRL : min_index = %d", min_index);
             if(min_index != 0) begin
               state <= IDLE ;
-              registers[14] <= 32'h00_00_00_01 ; 
+              registers_14 <= 32'h00_00_00_01 ; 
               $display("PWR_CTRL : triger WAKEUP, going IDLE");
             end else begin
               state <= WAIT ; 
