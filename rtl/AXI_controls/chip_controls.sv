@@ -5,7 +5,7 @@ module chip_control #(
   )(
     ADAM_SEQ.Slave seq_port,
     AXI_LITE.Slave axi_port
-    `ifdef SYNTHESIS 
+    `ifdef VIVADO 
     ,chip_ports.Master chip_port
     `endif 
   ) ;
@@ -592,7 +592,7 @@ module chip_control #(
     end
 
     // Chip instanciation
-    `ifndef SYNTHESIS
+    `ifndef VIVADO
         Bayesian_log2 chip (
             .clk(chip_clk), 
             .CBL0(CBL0),
