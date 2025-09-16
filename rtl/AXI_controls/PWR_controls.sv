@@ -222,8 +222,10 @@ module PWR_CTRL #(
             v1 = result[15:8];
             v2 = result[23:16];
             v3 = result[31:24];
-            if (v0 == v1 || v0 == v2 || v0 == v3 || v1 == v2 || v1 == v3 || v2 == v3) begin
-              min_index = 2'd3 ;
+
+            // Equality case: if all values are equal, set min_index to 0
+            if ((v0 == v1) && (v1 == v2) && (v2 == v3)) begin
+              min_index = 2'd3;
             end else if (v0 <= v1 && v0 <= v2 && v0 <= v3) begin
               min_index = 2'd0;
             end else if (v1 <= v0 && v1 <= v2 && v1 <= v3) begin
