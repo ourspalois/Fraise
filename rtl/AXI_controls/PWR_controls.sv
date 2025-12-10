@@ -199,25 +199,25 @@ module PWR_CTRL #(
         IDLE: begin
          if(pwr_launch) begin
            state <= WAIT;
-            $display("PWR_CTRL : WAIT state");
+            $display("PWR_CTRL : WAIT state, time : %.03f ms", $realtime / 1ms);
          end
          
         end
         WAIT: begin
           if(counter_done) begin
             state <= FETCH;
-            $display("PWR_CTRL : FETCH state");
+            $display("PWR_CTRL : FETCH state, time : %.03f ms", $realtime / 1ms);
           end
         end
         FETCH: begin
           if(fetch_counter == 32'h1) begin
             state <= COMPUTE;
-            $display("PWR_CTRL : COMPUTE state");
+            $display("PWR_CTRL : COMPUTE state, time : %.03f ms", $realtime / 1ms);
           end
         end
         COMPUTE: begin
           if(compute_done) begin
-            $display("PWR_CTRL : COMPUTE done, result = %h", result);
+            $display("PWR_CTRL : COMPUTE done, result = %h, time : %.03f ms", result, $realtime / 1ms);
             v0 = result[7:0];
             v1 = result[15:8];
             v2 = result[23:16];
@@ -239,7 +239,7 @@ module PWR_CTRL #(
             if(min_index != 0) begin
               state <= IDLE ;
               registers_14 <= 32'h00_00_00_01 ; 
-              $display("PWR_CTRL : triger WAKEUP, going IDLE");
+              $display("PWR_CTRL : triger WAKEUP, going IDLE, time : %.03f ms", $realtime / 1ms);
             end else begin
               state <= WAIT ; 
               $display("PWR_CTRL : WAIT state");
